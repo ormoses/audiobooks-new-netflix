@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkDatabaseHealth, getBookCount } from '@/lib/db';
 
 export async function GET() {
-  const dbHealth = checkDatabaseHealth();
+  const dbHealth = await checkDatabaseHealth();
 
   if (!dbHealth.ok) {
     return NextResponse.json(
@@ -15,7 +15,7 @@ export async function GET() {
     );
   }
 
-  const bookCount = getBookCount();
+  const bookCount = await getBookCount();
 
   return NextResponse.json({
     ok: true,

@@ -3,9 +3,8 @@
 
 export const SCHEMA_VERSION = 1;
 
-export const createTablesSQL = `
--- Books table - main audiobook catalog
--- Will be expanded in Step 2 with full CSV fields
+// Individual table creation statements
+export const createBooksTableSQL = `
 CREATE TABLE IF NOT EXISTS books (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   path TEXT UNIQUE NOT NULL,
@@ -15,22 +14,19 @@ CREATE TABLE IF NOT EXISTS books (
   series_book_number REAL,
   narrator TEXT,
   duration_seconds INTEGER,
-  -- User-editable fields (Step 3)
   status TEXT DEFAULT 'not_started' CHECK(status IN ('not_started', 'in_progress', 'finished')),
   rating INTEGER CHECK(rating IS NULL OR (rating >= 1 AND rating <= 5)),
-  -- Timestamps
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
+)`;
 
--- App metadata for tracking import state, schema version, etc.
+export const createAppMetaTableSQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
   key TEXT PRIMARY KEY,
   value TEXT
-);
+)`;
 
--- Narrator ratings table (Step 3)
--- Allows rating each narrator separately for finished books
+export const createNarratorRatingsTableSQL = `
 CREATE TABLE IF NOT EXISTS narrator_ratings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id INTEGER NOT NULL,
@@ -39,16 +35,26 @@ CREATE TABLE IF NOT EXISTS narrator_ratings (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
   UNIQUE(book_id, narrator_name)
-);
+)`;
 
--- Indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_books_status ON books(status);
-CREATE INDEX IF NOT EXISTS idx_books_series ON books(series);
-CREATE INDEX IF NOT EXISTS idx_books_author ON books(author);
-CREATE INDEX IF NOT EXISTS idx_books_rating ON books(rating);
-`;
+// Index creation statements
+export const createIndexesSQL = [
+  'CREATE INDEX IF NOT EXISTS idx_books_status ON books(status)',
+  'CREATE INDEX IF NOT EXISTS idx_books_series ON books(series)',
+  'CREATE INDEX IF NOT EXISTS idx_books_author ON books(author)',
+  'CREATE INDEX IF NOT EXISTS idx_books_rating ON books(rating)',
+];
 
-export const initializeMetaSQL = `
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '${SCHEMA_VERSION}');
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('last_import', NULL);
-`;
+// Meta initialization statements
+export const initializeMetaSQL = [
+  `INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '${SCHEMA_VERSION}')`,
+  `INSERT OR IGNORE INTO app_meta (key, value) VALUES ('last_import', NULL)`,
+];
+
+// All schema statements in order
+export const allSchemaStatements = [
+  createBooksTableSQL,
+  createAppMetaTableSQL,
+  createNarratorRatingsTableSQL,
+  ...createIndexesSQL,
+];

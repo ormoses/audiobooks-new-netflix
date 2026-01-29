@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable server external packages for better-sqlite3
-  serverExternalPackages: ['better-sqlite3'],
+  // Configuration for Next.js
 };
 
 module.exports = nextConfig;
