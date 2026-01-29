@@ -1,31 +1,40 @@
 // Database schema definitions
 // This file is server-only
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
-// Individual table creation statements
+// Books table - full schema for CSV import
 export const createBooksTableSQL = `
 CREATE TABLE IF NOT EXISTS books (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   path TEXT UNIQUE NOT NULL,
+  type TEXT NOT NULL CHECK(type IN ('Folder', 'SingleFile')),
   title TEXT NOT NULL,
   author TEXT,
-  series TEXT,
-  series_book_number REAL,
   narrator TEXT,
   duration_seconds INTEGER,
-  status TEXT DEFAULT 'not_started' CHECK(status IN ('not_started', 'in_progress', 'finished')),
-  rating INTEGER CHECK(rating IS NULL OR (rating >= 1 AND rating <= 5)),
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  has_embedded_cover INTEGER,
+  total_size_bytes INTEGER,
+  file_count INTEGER,
+  is_duplicate INTEGER,
+  series TEXT,
+  series_book_number TEXT,
+  series_ended INTEGER,
+  series_name_raw TEXT,
+  series_exact_name_raw TEXT,
+  source TEXT DEFAULT 'csv',
+  date_added TEXT DEFAULT CURRENT_TIMESTAMP,
+  date_updated TEXT DEFAULT CURRENT_TIMESTAMP
 )`;
 
+// App metadata table
 export const createAppMetaTableSQL = `
 CREATE TABLE IF NOT EXISTS app_meta (
   key TEXT PRIMARY KEY,
   value TEXT
 )`;
 
+// Narrator ratings table (for Step 3)
 export const createNarratorRatingsTableSQL = `
 CREATE TABLE IF NOT EXISTS narrator_ratings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,16 +48,18 @@ CREATE TABLE IF NOT EXISTS narrator_ratings (
 
 // Index creation statements
 export const createIndexesSQL = [
-  'CREATE INDEX IF NOT EXISTS idx_books_status ON books(status)',
-  'CREATE INDEX IF NOT EXISTS idx_books_series ON books(series)',
+  'CREATE INDEX IF NOT EXISTS idx_books_title ON books(title)',
   'CREATE INDEX IF NOT EXISTS idx_books_author ON books(author)',
-  'CREATE INDEX IF NOT EXISTS idx_books_rating ON books(rating)',
+  'CREATE INDEX IF NOT EXISTS idx_books_series ON books(series)',
+  'CREATE INDEX IF NOT EXISTS idx_books_narrator ON books(narrator)',
+  'CREATE INDEX IF NOT EXISTS idx_books_is_duplicate ON books(is_duplicate)',
 ];
 
 // Meta initialization statements
 export const initializeMetaSQL = [
   `INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '${SCHEMA_VERSION}')`,
-  `INSERT OR IGNORE INTO app_meta (key, value) VALUES ('last_import', NULL)`,
+  `INSERT OR IGNORE INTO app_meta (key, value) VALUES ('last_import_at', NULL)`,
+  `INSERT OR IGNORE INTO app_meta (key, value) VALUES ('last_csv_path', NULL)`,
 ];
 
 // All schema statements in order
@@ -57,4 +68,22 @@ export const allSchemaStatements = [
   createAppMetaTableSQL,
   createNarratorRatingsTableSQL,
   ...createIndexesSQL,
+];
+
+// Migration: Add columns that might be missing from Step 1 schema
+// These are safe to run even if columns already exist (SQLite will error, which we catch)
+export const migrationColumns = [
+  { table: 'books', column: 'type', definition: 'TEXT DEFAULT \'Folder\'' },
+  { table: 'books', column: 'narrator', definition: 'TEXT' },
+  { table: 'books', column: 'has_embedded_cover', definition: 'INTEGER' },
+  { table: 'books', column: 'total_size_bytes', definition: 'INTEGER' },
+  { table: 'books', column: 'file_count', definition: 'INTEGER' },
+  { table: 'books', column: 'is_duplicate', definition: 'INTEGER' },
+  { table: 'books', column: 'series_book_number', definition: 'TEXT' },
+  { table: 'books', column: 'series_ended', definition: 'INTEGER' },
+  { table: 'books', column: 'series_name_raw', definition: 'TEXT' },
+  { table: 'books', column: 'series_exact_name_raw', definition: 'TEXT' },
+  { table: 'books', column: 'source', definition: 'TEXT DEFAULT \'csv\'' },
+  { table: 'books', column: 'date_added', definition: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
+  { table: 'books', column: 'date_updated', definition: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
 ];

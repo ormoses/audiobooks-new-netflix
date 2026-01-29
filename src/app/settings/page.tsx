@@ -1,6 +1,12 @@
 import PageHeader from '@/components/PageHeader';
+import ImportSection from '@/components/ImportSection';
+import { getAppMeta } from '@/lib/db';
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  // Fetch last CSV path and import timestamp from database
+  const lastCsvPath = await getAppMeta('last_csv_path');
+  const lastImportAt = await getAppMeta('last_import_at');
+
   return (
     <div>
       <PageHeader
@@ -10,20 +16,12 @@ export default function SettingsPage() {
 
       <div className="max-w-2xl space-y-8">
         {/* Import Section */}
-        <section className="bg-netflix-dark rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-white mb-2">
-            Import Library
-          </h2>
-          <p className="text-netflix-light-gray mb-4">
-            Import your audiobook catalog from a CSV file. This will populate
-            your library with book metadata.
-          </p>
-          <div className="bg-netflix-gray/50 rounded-md p-4 text-center text-netflix-light-gray">
-            CSV import will be available in Step 2
-          </div>
-        </section>
+        <ImportSection
+          initialCsvPath={lastCsvPath}
+          lastImportAt={lastImportAt}
+        />
 
-        {/* Export Section */}
+        {/* Export Section (placeholder for Step 5) */}
         <section className="bg-netflix-dark rounded-lg p-6">
           <h2 className="text-xl font-semibold text-white mb-2">
             Export Data
@@ -42,7 +40,7 @@ export default function SettingsPage() {
             About
           </h2>
           <p className="text-netflix-light-gray">
-            AudioBooks Catalog v0.1.0
+            AudioBooks Catalog v0.2.0
           </p>
           <p className="text-netflix-light-gray text-sm mt-2">
             A Netflix-style audiobook discovery and tracking app.
