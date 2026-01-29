@@ -5,7 +5,7 @@ import 'server-only';
 import { createClient, Client } from '@libsql/client';
 import path from 'path';
 import fs from 'fs';
-import { allSchemaStatements, initializeMetaSQL, migrationColumns } from './schema';
+import { createTablesSQL, initializeMetaSQL, migrationColumns, createIndexesSQL } from './schema';
 import { Book, BookSummary, ImportSummary } from './types';
 import { ParsedBook } from './csv-parser';
 
@@ -43,7 +43,19 @@ export function getDatabase(): Client {
   return db;
 }
 
-// Initialize schema with migrations
+// Get existing columns for a table
+async function getTableColumns(database: Client, tableName: string): Promise<Set<string>> {
+  const result = await database.execute(`PRAGMA table_info(${tableName})`);
+  const columns = new Set<string>();
+  for (const row of result.rows) {
+    if (row.name) {
+      columns.add(row.name as string);
+    }
+  }
+  return columns;
+}
+
+// Initialize schema with proper migration order
 export async function initializeSchema(): Promise<void> {
   if (schemaInitialized) {
     return;
@@ -54,24 +66,45 @@ export async function initializeSchema(): Promise<void> {
   // Enable foreign keys
   await database.execute('PRAGMA foreign_keys = ON');
 
-  // Run all schema creation statements
-  for (const statement of allSchemaStatements) {
+  // Step 1: Create tables (IF NOT EXISTS - safe for existing DBs)
+  for (const statement of createTablesSQL) {
     await database.execute(statement);
   }
 
-  // Run migrations: add columns that might be missing
+  // Step 2: Get existing columns in books table
+  const existingColumns = await getTableColumns(database, 'books');
+  console.log(`[DB] Existing books columns: ${Array.from(existingColumns).join(', ')}`);
+
+  // Step 3: Add missing columns via ALTER TABLE
   for (const migration of migrationColumns) {
-    try {
-      await database.execute(
-        `ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.definition}`
-      );
-      console.log(`[DB] Added column: ${migration.table}.${migration.column}`);
-    } catch (error) {
-      // Column likely already exists, ignore error
+    if (!existingColumns.has(migration.column)) {
+      try {
+        await database.execute(
+          `ALTER TABLE books ADD COLUMN ${migration.column} ${migration.definition}`
+        );
+        existingColumns.add(migration.column); // Track that we added it
+        console.log(`[DB] Added column: books.${migration.column}`);
+      } catch (error) {
+        // Log but continue - column might already exist despite PRAGMA not showing it
+        console.log(`[DB] Could not add column ${migration.column}:`, error);
+      }
     }
   }
 
-  // Initialize meta data
+  // Step 4: Create indexes only for columns that exist
+  for (const index of createIndexesSQL) {
+    if (existingColumns.has(index.column)) {
+      try {
+        await database.execute(index.sql);
+      } catch (error) {
+        // Index might already exist, ignore
+      }
+    } else {
+      console.log(`[DB] Skipping index on ${index.column} - column does not exist`);
+    }
+  }
+
+  // Step 5: Initialize meta data
   for (const statement of initializeMetaSQL) {
     await database.execute(statement);
   }
@@ -199,7 +232,7 @@ export async function getBookById(id: number): Promise<Book | null> {
   return {
     id: row.id as number,
     path: row.path as string,
-    type: row.type as 'Folder' | 'SingleFile',
+    type: (row.type as string) || 'Folder' as 'Folder' | 'SingleFile',
     title: row.title as string,
     author: row.author as string | null,
     narrator: row.narrator as string | null,
@@ -213,9 +246,9 @@ export async function getBookById(id: number): Promise<Book | null> {
     series_ended: row.series_ended === 1 ? true : row.series_ended === 0 ? false : null,
     series_name_raw: row.series_name_raw as string | null,
     series_exact_name_raw: row.series_exact_name_raw as string | null,
-    source: row.source as string,
-    date_added: row.date_added as string,
-    date_updated: row.date_updated as string,
+    source: (row.source as string) || 'csv',
+    date_added: (row.date_added as string) || new Date().toISOString(),
+    date_updated: (row.date_updated as string) || new Date().toISOString(),
   };
 }
 
