@@ -2,18 +2,31 @@
 
 import Link from 'next/link';
 import { BookSummary } from '@/lib/types';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration } from '@/lib/formatters';
+import StatusBadge from './StatusBadge';
+import StarRating from './StarRating';
 
 interface BookCardProps {
   book: BookSummary;
+  seriesKey?: string; // For back navigation from book detail
+  libraryUrl?: string; // Original library URL for back navigation
 }
 
-export default function BookCard({ book }: BookCardProps) {
+export default function BookCard({ book, seriesKey, libraryUrl }: BookCardProps) {
   const duration = formatDuration(book.duration_seconds);
+
+  // Build href with navigation context
+  let href = `/book/${book.id}`;
+  const params = new URLSearchParams();
+  if (libraryUrl) params.set('from', libraryUrl);
+  if (seriesKey) params.set('seriesKey', seriesKey);
+  if (params.toString()) {
+    href += `?${params.toString()}`;
+  }
 
   return (
     <Link
-      href={`/book/${book.id}`}
+      href={href}
       className="group block bg-netflix-dark rounded-md overflow-hidden hover:scale-105 hover:z-10 transition-transform duration-200"
     >
       {/* Placeholder cover */}
@@ -32,10 +45,22 @@ export default function BookCard({ book }: BookCardProps) {
           />
         </svg>
 
-        {/* Duplicate badge */}
+        {/* Status badge - top left */}
+        <div className="absolute top-2 left-2">
+          <StatusBadge status={book.status} size="sm" />
+        </div>
+
+        {/* Duplicate badge - top right */}
         {book.is_duplicate && (
           <div className="absolute top-2 right-2 px-2 py-0.5 bg-yellow-600 text-white text-xs font-medium rounded">
             Duplicate
+          </div>
+        )}
+
+        {/* Rating - bottom left */}
+        {book.book_rating && (
+          <div className="absolute bottom-2 left-2 bg-black/70 rounded px-1.5 py-0.5">
+            <StarRating rating={book.book_rating} readonly size="sm" />
           </div>
         )}
 

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useToast } from './Toast';
 import { ImportSummary } from '@/lib/types';
-import { formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/formatters';
 
 interface ImportSectionProps {
   initialCsvPath: string | null;

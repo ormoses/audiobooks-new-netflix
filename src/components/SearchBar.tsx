@@ -6,14 +6,16 @@ interface SearchBarProps {
   onSearch: (query: string) => void;
   placeholder?: string;
   debounceMs?: number;
+  initialValue?: string;
 }
 
 export default function SearchBar({
   onSearch,
   placeholder = 'Search by title, author, series, or narrator...',
   debounceMs = 300,
+  initialValue = '',
 }: SearchBarProps) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialValue);
 
   // Debounced search
   useEffect(() => {

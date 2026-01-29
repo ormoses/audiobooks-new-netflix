@@ -6,6 +6,8 @@ import BookCard from './BookCard';
 interface BookGridProps {
   books: BookSummary[];
   loading?: boolean;
+  seriesKey?: string; // For back navigation from book detail
+  libraryUrl?: string; // Original library URL for back navigation
 }
 
 // Loading skeleton card
@@ -22,7 +24,7 @@ function SkeletonCard() {
   );
 }
 
-export default function BookGrid({ books, loading }: BookGridProps) {
+export default function BookGrid({ books, loading, seriesKey, libraryUrl }: BookGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -40,7 +42,7 @@ export default function BookGrid({ books, loading }: BookGridProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       {books.map((book) => (
-        <BookCard key={book.id} book={book} />
+        <BookCard key={book.id} book={book} seriesKey={seriesKey} libraryUrl={libraryUrl} />
       ))}
     </div>
   );
