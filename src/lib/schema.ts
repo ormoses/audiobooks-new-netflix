@@ -1,7 +1,7 @@
 // Database schema definitions
 // This file is server-only
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // Valid status values - matches database CHECK constraint
 export const BOOK_STATUSES = ['not_started', 'in_progress', 'finished'] as const;
@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS books (
   book_rating INTEGER CHECK(book_rating IS NULL OR (book_rating >= 1 AND book_rating <= 5)),
   tags TEXT,
   notes TEXT,
+  cover_image_path TEXT,
+  missing_from_csv INTEGER DEFAULT 0,
   date_added TEXT DEFAULT CURRENT_TIMESTAMP,
   date_updated TEXT DEFAULT CURRENT_TIMESTAMP
 )`;
@@ -106,6 +108,9 @@ export const migrationColumns: Array<{ column: string; definition: string }> = [
   { column: 'book_rating', definition: 'INTEGER' },
   { column: 'tags', definition: 'TEXT' },
   { column: 'notes', definition: 'TEXT' },
+  // Step 5 columns
+  { column: 'cover_image_path', definition: 'TEXT' },
+  { column: 'missing_from_csv', definition: 'INTEGER DEFAULT 0' },
 ];
 
 // Migration: Add columns that might be missing from narrator_ratings table

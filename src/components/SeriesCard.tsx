@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { SeriesStats } from '@/lib/types';
 import { formatDuration } from '@/lib/formatters';
@@ -11,8 +12,15 @@ interface SeriesCardProps {
 }
 
 export default function SeriesCard({ series, libraryUrl }: SeriesCardProps) {
+  const [imageError, setImageError] = useState(false);
   const duration = formatDuration(series.totalDurationSeconds);
   const isStandalone = series.seriesKey === 'standalone';
+  const hasCover = series.coverBookId !== null && !imageError;
+
+  // Build cover URL with cache-busting
+  const coverUrl = hasCover
+    ? `/api/covers/${series.coverBookId}?v=${encodeURIComponent(series.coverUpdatedAt ?? '')}`
+    : null;
 
   // Build href with from parameter to preserve library state
   const href = libraryUrl
@@ -33,42 +41,51 @@ export default function SeriesCard({ series, libraryUrl }: SeriesCardProps) {
       href={href}
       className="group block bg-netflix-dark rounded-md overflow-hidden hover:scale-105 hover:z-10 transition-transform duration-200"
     >
-      {/* Placeholder cover */}
-      <div className="aspect-[2/3] bg-netflix-gray flex items-center justify-center relative">
-        <div className="text-center p-4">
-          {isStandalone ? (
-            <svg
-              className="w-12 h-12 mx-auto text-netflix-light-gray/50 mb-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-              />
-            </svg>
-          ) : (
-            <svg
-              className="w-12 h-12 mx-auto text-netflix-light-gray/50 mb-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-              />
-            </svg>
-          )}
-          <span className="text-netflix-light-gray/70 text-sm">
-            {series.bookCount} {series.bookCount === 1 ? 'book' : 'books'}
-          </span>
-        </div>
+      {/* Cover image or placeholder */}
+      <div className="aspect-[2/3] bg-netflix-gray flex items-center justify-center relative overflow-hidden">
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt={series.seriesName}
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="text-center p-4">
+            {isStandalone ? (
+              <svg
+                className="w-12 h-12 mx-auto text-netflix-light-gray/50 mb-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-12 h-12 mx-auto text-netflix-light-gray/50 mb-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+            )}
+            <span className="text-netflix-light-gray/70 text-sm">
+              {series.bookCount} {series.bookCount === 1 ? 'book' : 'books'}
+            </span>
+          </div>
+        )}
 
         {/* Status badge */}
         <div className="absolute top-2 left-2">

@@ -209,7 +209,7 @@ export async function parseCsvFile(filePath: string): Promise<CsvParseResult> {
           parseErrors,
         });
       },
-      error: (error) => {
+      error: (error: Error) => {
         resolve({
           success: false,
           books: [],

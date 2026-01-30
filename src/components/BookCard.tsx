@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { BookSummary } from '@/lib/types';
 import { formatDuration } from '@/lib/formatters';
@@ -13,7 +14,9 @@ interface BookCardProps {
 }
 
 export default function BookCard({ book, seriesKey, libraryUrl }: BookCardProps) {
+  const [imageError, setImageError] = useState(false);
   const duration = formatDuration(book.duration_seconds);
+  const hasCover = book.cover_image_path && !imageError;
 
   // Build href with navigation context
   let href = `/book/${book.id}`;
@@ -29,33 +32,49 @@ export default function BookCard({ book, seriesKey, libraryUrl }: BookCardProps)
       href={href}
       className="group block bg-netflix-dark rounded-md overflow-hidden hover:scale-105 hover:z-10 transition-transform duration-200"
     >
-      {/* Placeholder cover */}
-      <div className="aspect-[2/3] bg-netflix-gray flex items-center justify-center relative">
-        <svg
-          className="w-16 h-16 text-netflix-light-gray/50"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+      {/* Cover image or placeholder */}
+      <div className="aspect-[2/3] bg-netflix-gray flex items-center justify-center relative overflow-hidden">
+        {hasCover ? (
+          <img
+            src={`/api/covers/${book.id}`}
+            alt={book.title}
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={() => setImageError(true)}
           />
-        </svg>
+        ) : (
+          <svg
+            className="w-16 h-16 text-netflix-light-gray/50"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+            />
+          </svg>
+        )}
 
         {/* Status badge - top left */}
         <div className="absolute top-2 left-2">
           <StatusBadge status={book.status} size="sm" />
         </div>
 
-        {/* Duplicate badge - top right */}
-        {book.is_duplicate && (
-          <div className="absolute top-2 right-2 px-2 py-0.5 bg-yellow-600 text-white text-xs font-medium rounded">
-            Duplicate
-          </div>
-        )}
+        {/* Badges - top right */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+          {book.is_duplicate && (
+            <div className="px-2 py-0.5 bg-yellow-600 text-white text-xs font-medium rounded">
+              Duplicate
+            </div>
+          )}
+          {book.missing_from_csv && (
+            <div className="px-2 py-0.5 bg-orange-600 text-white text-xs font-medium rounded">
+              Missing
+            </div>
+          )}
+        </div>
 
         {/* Rating - bottom left */}
         {book.book_rating && (

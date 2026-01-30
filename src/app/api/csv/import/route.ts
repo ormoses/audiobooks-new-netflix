@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCsvFile } from '@/lib/csv-parser';
-import { upsertBooks, setAppMeta } from '@/lib/db';
+import { upsertBooks, setAppMeta, getAllBookPaths, markMissingBooks } from '@/lib/db';
 import { ImportResponse, ImportSummary } from '@/lib/types';
 
 export async function POST(request: NextRequest): Promise<NextResponse<ImportResponse>> {
@@ -15,6 +15,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<ImportRes
       });
     }
 
+    // Get all existing book paths before import
+    const existingPaths = await getAllBookPaths();
+
     // Parse CSV file
     const parseResult = await parseCsvFile(path);
 
@@ -25,8 +28,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<ImportRes
       });
     }
 
+    // Collect paths from CSV
+    const csvPaths = new Set(parseResult.books.map(b => b.path));
+
     // Upsert books into database
     const dbSummary = await upsertBooks(parseResult.books);
+
+    // Find books that exist in DB but not in CSV
+    const missingPaths = new Set<string>();
+    existingPaths.forEach((existingPath) => {
+      if (!csvPaths.has(existingPath)) {
+        missingPaths.add(existingPath);
+      }
+    });
+
+    // Mark missing books
+    const markedMissing = await markMissingBooks(missingPaths);
 
     // Build final summary
     const summary: ImportSummary = {
@@ -35,6 +52,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ImportRes
       updated: dbSummary.updated,
       skipped: parseResult.skippedRows,
       errors: parseResult.parseErrors + dbSummary.errors,
+      markedMissing,
     };
 
     // Store last CSV path and import timestamp

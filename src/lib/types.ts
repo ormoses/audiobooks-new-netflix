@@ -27,6 +27,9 @@ export interface Book {
   book_rating: number | null;
   tags: string | null;
   notes: string | null;
+  // Step 5 fields
+  cover_image_path: string | null;
+  missing_from_csv: boolean;
   date_added: string;
   date_updated: string;
 }
@@ -43,6 +46,9 @@ export interface BookSummary {
   // User fields for display
   status: BookStatus;
   book_rating: number | null;
+  // Step 5 fields
+  cover_image_path: string | null;
+  missing_from_csv: boolean;
 }
 
 // Narrator rating record
@@ -96,6 +102,7 @@ export interface ImportSummary {
   updated: number;
   skipped: number;
   errors: number;
+  markedMissing: number; // Books in DB but not in CSV (Step 5)
 }
 
 // API response types
@@ -241,6 +248,8 @@ export interface SeriesStats {
   unratedCount: number; // Books not fully rated
   completionStatus: SeriesCompletionStatus;
   completionPercent: number; // finishedCount / bookCount * 100
+  coverBookId: number | null; // Book ID to use for series cover
+  coverUpdatedAt: string | null; // For cache-busting
 }
 
 // Extended book summary with narrator info for filtering
@@ -249,6 +258,8 @@ export interface BookSummaryWithNarrators extends BookSummary {
   narrators: string[];
   narratorRatings: Record<string, number | null>;
   date_added: string;
+  date_updated: string;
+  // Note: cover_image_path and missing_from_csv inherited from BookSummary
 }
 
 // Series response
@@ -264,4 +275,28 @@ export interface BooksWithNarratorsResponse {
   books: BookSummaryWithNarrators[];
   total: number;
   error?: string;
+}
+
+// ============ Step 5: Export + Covers ============
+
+// Cover extraction request
+export interface CoverExtractRequest {
+  bookIds?: number[];
+  overwrite?: boolean;
+}
+
+// Cover extraction response
+export interface CoverExtractResponse {
+  ok: boolean;
+  processed: number;
+  extracted: number;
+  skipped: number;
+  errors: number;
+  error?: string;
+}
+
+// Export response (streaming CSV, no JSON needed)
+export interface ExportInfo {
+  totalBooks: number;
+  exportedAt: string;
 }

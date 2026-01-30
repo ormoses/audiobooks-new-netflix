@@ -1,5 +1,7 @@
 import PageHeader from '@/components/PageHeader';
 import ImportSection from '@/components/ImportSection';
+import ExportSection from '@/components/ExportSection';
+import CoverExtractionSection from '@/components/CoverExtractionSection';
 import { getAppMeta } from '@/lib/db';
 
 export default async function SettingsPage() {
@@ -21,18 +23,11 @@ export default async function SettingsPage() {
           lastImportAt={lastImportAt}
         />
 
-        {/* Export Section (placeholder for Step 5) */}
-        <section className="bg-netflix-dark rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-white mb-2">
-            Export Data
-          </h2>
-          <p className="text-netflix-light-gray mb-4">
-            Export your library data including ratings and listening status.
-          </p>
-          <div className="bg-netflix-gray/50 rounded-md p-4 text-center text-netflix-light-gray">
-            Export will be available in Step 5
-          </div>
-        </section>
+        {/* Export Section */}
+        <ExportSection />
+
+        {/* Cover Extraction Section */}
+        <CoverExtractionSection />
 
         {/* About Section */}
         <section className="bg-netflix-dark rounded-lg p-6">
@@ -40,7 +35,7 @@ export default async function SettingsPage() {
             About
           </h2>
           <p className="text-netflix-light-gray">
-            AudioBooks Catalog v0.2.0
+            AudioBooks Catalog v0.3.0
           </p>
           <p className="text-netflix-light-gray text-sm mt-2">
             A Netflix-style audiobook discovery and tracking app.

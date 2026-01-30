@@ -14,31 +14,44 @@ interface BookDetailWithProgressProps {
 
 export default function BookDetailWithProgress({ initialBook }: BookDetailWithProgressProps) {
   const [book, setBook] = useState<BookWithRatings>(initialBook);
+  const [imageError, setImageError] = useState(false);
 
   // Sync local state when initialBook changes (e.g., after navigation)
   useEffect(() => {
     setBook(initialBook);
+    setImageError(false); // Reset image error on book change
   }, [initialBook]);
+
+  const hasCover = book.cover_image_path && !imageError;
 
   return (
     <>
       {/* Header */}
       <div className="flex gap-6 mb-8">
-        {/* Placeholder cover */}
-        <div className="flex-shrink-0 w-48 h-72 bg-netflix-gray rounded-md flex items-center justify-center relative">
-          <svg
-            className="w-20 h-20 text-netflix-light-gray/50"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1}
-              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+        {/* Cover image or placeholder */}
+        <div className="flex-shrink-0 w-48 h-72 bg-netflix-gray rounded-md flex items-center justify-center relative overflow-hidden">
+          {hasCover ? (
+            <img
+              src={`/api/covers/${book.id}`}
+              alt={book.title}
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={() => setImageError(true)}
             />
-          </svg>
+          ) : (
+            <svg
+              className="w-20 h-20 text-netflix-light-gray/50"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1}
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
+          )}
 
           {/* Status badge overlay */}
           <div className="absolute top-2 left-2">
@@ -96,6 +109,11 @@ export default function BookDetailWithProgress({ initialBook }: BookDetailWithPr
             {book.is_duplicate && (
               <span className="px-2 py-1 bg-yellow-600 text-white text-xs font-medium rounded">
                 Duplicate
+              </span>
+            )}
+            {book.missing_from_csv && (
+              <span className="px-2 py-1 bg-orange-600 text-white text-xs font-medium rounded">
+                Missing from CSV
               </span>
             )}
             <span className="px-2 py-1 bg-netflix-gray text-netflix-light-gray text-xs rounded">

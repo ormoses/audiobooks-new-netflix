@@ -223,7 +223,8 @@ export async function getBooks(search?: string): Promise<BookSummary[]> {
   const database = getDatabase();
 
   let sql = `
-    SELECT id, title, author, series, series_book_number, duration_seconds, is_duplicate, status, book_rating
+    SELECT id, title, author, series, series_book_number, duration_seconds, is_duplicate,
+           status, book_rating, cover_image_path, missing_from_csv
     FROM books
   `;
   const args: (string | number)[] = [];
@@ -253,6 +254,8 @@ export async function getBooks(search?: string): Promise<BookSummary[]> {
     is_duplicate: row.is_duplicate === 1,
     status: (row.status as BookStatus) || 'not_started',
     book_rating: row.book_rating as number | null,
+    cover_image_path: row.cover_image_path as string | null,
+    missing_from_csv: row.missing_from_csv === 1,
   }));
 }
 
@@ -293,13 +296,63 @@ export async function getBookById(id: number): Promise<Book | null> {
     book_rating: row.book_rating as number | null,
     tags: row.tags as string | null,
     notes: row.notes as string | null,
+    cover_image_path: row.cover_image_path as string | null,
+    missing_from_csv: row.missing_from_csv === 1,
     date_added: (row.date_added as string) || new Date().toISOString(),
     date_updated: (row.date_updated as string) || new Date().toISOString(),
   };
 }
 
-// Upsert books from CSV import
-export async function upsertBooks(books: ParsedBook[]): Promise<ImportSummary> {
+// Get all book paths for missing detection
+export async function getAllBookPaths(): Promise<Set<string>> {
+  await initializeSchema();
+  const database = getDatabase();
+  const result = await database.execute('SELECT path FROM books');
+  return new Set(result.rows.map(row => row.path as string));
+}
+
+// Mark books as missing from CSV
+export async function markMissingBooks(missingPaths: Set<string>): Promise<number> {
+  if (missingPaths.size === 0) return 0;
+
+  await initializeSchema();
+  const database = getDatabase();
+  const now = new Date().toISOString();
+
+  let marked = 0;
+  const pathsArray = Array.from(missingPaths);
+  for (const path of pathsArray) {
+    try {
+      await database.execute({
+        sql: 'UPDATE books SET missing_from_csv = 1, date_updated = ? WHERE path = ?',
+        args: [now, path]
+      });
+      marked++;
+    } catch (error) {
+      console.error(`[DB] Error marking book missing: ${path}`, error);
+    }
+  }
+  return marked;
+}
+
+// Clear missing_from_csv flag for books that are in CSV
+export async function clearMissingFlag(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+
+  await initializeSchema();
+  const database = getDatabase();
+  const now = new Date().toISOString();
+
+  for (const path of paths) {
+    await database.execute({
+      sql: 'UPDATE books SET missing_from_csv = 0, date_updated = ? WHERE path = ? AND missing_from_csv = 1',
+      args: [now, path]
+    });
+  }
+}
+
+// Upsert books from CSV import with merge logic
+export async function upsertBooks(books: ParsedBook[]): Promise<Omit<ImportSummary, 'markedMissing'>> {
   await initializeSchema();
   const database = getDatabase();
 
@@ -309,56 +362,109 @@ export async function upsertBooks(books: ParsedBook[]): Promise<ImportSummary> {
 
   for (const book of books) {
     try {
-      // Check if book exists
+      // Check if book exists and get its current source
       const existing = await database.execute({
-        sql: 'SELECT id FROM books WHERE path = ?',
+        sql: 'SELECT id, source, title, author, narrator FROM books WHERE path = ?',
         args: [book.path]
       });
 
       const now = new Date().toISOString();
 
       if (existing.rows.length > 0) {
-        // Update existing book
-        await database.execute({
-          sql: `
-            UPDATE books SET
-              type = ?,
-              title = ?,
-              author = ?,
-              narrator = ?,
-              duration_seconds = ?,
-              has_embedded_cover = ?,
-              total_size_bytes = ?,
-              file_count = ?,
-              is_duplicate = ?,
-              series = ?,
-              series_book_number = ?,
-              series_ended = ?,
-              series_name_raw = ?,
-              series_exact_name_raw = ?,
-              source = 'csv',
-              date_updated = ?
-            WHERE path = ?
-          `,
-          args: [
-            book.type,
-            book.title,
-            book.author,
-            book.narrator,
-            book.duration_seconds,
-            book.has_embedded_cover === null ? null : book.has_embedded_cover ? 1 : 0,
-            book.total_size_bytes,
-            book.file_count,
-            book.is_duplicate === null ? null : book.is_duplicate ? 1 : 0,
-            book.series,
-            book.series_book_number,
-            book.series_ended === null ? null : book.series_ended ? 1 : 0,
-            book.series_name_raw,
-            book.series_exact_name_raw,
-            now,
-            book.path
-          ]
-        });
+        const row = existing.rows[0];
+        const existingSource = row.source as string;
+        const isManual = existingSource === 'manual';
+
+        // For manual source books: only update metadata if existing field is empty
+        // For csv source books: always update metadata
+        // Never change source if it's 'manual'
+        // Always clear missing_from_csv flag
+        if (isManual) {
+          // Selective update for manual books - only update empty fields
+          await database.execute({
+            sql: `
+              UPDATE books SET
+                type = COALESCE(type, ?),
+                title = CASE WHEN title IS NULL OR title = '' THEN ? ELSE title END,
+                author = CASE WHEN author IS NULL OR author = '' THEN ? ELSE author END,
+                narrator = CASE WHEN narrator IS NULL OR narrator = '' THEN ? ELSE narrator END,
+                duration_seconds = COALESCE(duration_seconds, ?),
+                has_embedded_cover = COALESCE(has_embedded_cover, ?),
+                total_size_bytes = COALESCE(total_size_bytes, ?),
+                file_count = COALESCE(file_count, ?),
+                is_duplicate = COALESCE(is_duplicate, ?),
+                series = CASE WHEN series IS NULL OR series = '' THEN ? ELSE series END,
+                series_book_number = COALESCE(series_book_number, ?),
+                series_ended = COALESCE(series_ended, ?),
+                series_name_raw = COALESCE(series_name_raw, ?),
+                series_exact_name_raw = COALESCE(series_exact_name_raw, ?),
+                missing_from_csv = 0,
+                date_updated = ?
+              WHERE path = ?
+            `,
+            args: [
+              book.type,
+              book.title,
+              book.author,
+              book.narrator,
+              book.duration_seconds,
+              book.has_embedded_cover === null ? null : book.has_embedded_cover ? 1 : 0,
+              book.total_size_bytes,
+              book.file_count,
+              book.is_duplicate === null ? null : book.is_duplicate ? 1 : 0,
+              book.series,
+              book.series_book_number,
+              book.series_ended === null ? null : book.series_ended ? 1 : 0,
+              book.series_name_raw,
+              book.series_exact_name_raw,
+              now,
+              book.path
+            ]
+          });
+        } else {
+          // Full update for csv source books
+          await database.execute({
+            sql: `
+              UPDATE books SET
+                type = ?,
+                title = ?,
+                author = ?,
+                narrator = ?,
+                duration_seconds = ?,
+                has_embedded_cover = ?,
+                total_size_bytes = ?,
+                file_count = ?,
+                is_duplicate = ?,
+                series = ?,
+                series_book_number = ?,
+                series_ended = ?,
+                series_name_raw = ?,
+                series_exact_name_raw = ?,
+                source = 'csv',
+                missing_from_csv = 0,
+                date_updated = ?
+              WHERE path = ?
+            `,
+            args: [
+              book.type,
+              book.title,
+              book.author,
+              book.narrator,
+              book.duration_seconds,
+              book.has_embedded_cover === null ? null : book.has_embedded_cover ? 1 : 0,
+              book.total_size_bytes,
+              book.file_count,
+              book.is_duplicate === null ? null : book.is_duplicate ? 1 : 0,
+              book.series,
+              book.series_book_number,
+              book.series_ended === null ? null : book.series_ended ? 1 : 0,
+              book.series_name_raw,
+              book.series_exact_name_raw,
+              now,
+              book.path
+            ]
+          });
+        }
         updated++;
       } else {
         // Insert new book
@@ -369,8 +475,8 @@ export async function upsertBooks(books: ParsedBook[]): Promise<ImportSummary> {
               has_embedded_cover, total_size_bytes, file_count, is_duplicate,
               series, series_book_number, series_ended,
               series_name_raw, series_exact_name_raw,
-              source, date_added, date_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?)
+              source, missing_from_csv, date_added, date_updated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', 0, ?, ?)
           `,
           args: [
             book.path,
@@ -613,7 +719,8 @@ export async function getAllBooksWithNarrators(): Promise<BookSummaryWithNarrato
   // Get all books
   const booksResult = await database.execute(`
     SELECT id, title, author, series, series_book_number, duration_seconds,
-           is_duplicate, status, book_rating, narrator, date_added
+           is_duplicate, status, book_rating, narrator, date_added, date_updated,
+           cover_image_path, missing_from_csv
     FROM books
     ORDER BY id
   `);
@@ -651,10 +758,13 @@ export async function getAllBooksWithNarrators(): Promise<BookSummaryWithNarrato
       is_duplicate: row.is_duplicate === 1,
       status: (row.status as BookStatus) || 'not_started',
       book_rating: row.book_rating as number | null,
+      cover_image_path: row.cover_image_path as string | null,
+      missing_from_csv: row.missing_from_csv === 1,
       narrator,
       narrators,
       narratorRatings,
       date_added: (row.date_added as string) || new Date().toISOString(),
+      date_updated: (row.date_updated as string) || new Date().toISOString(),
     };
   });
 }
@@ -675,13 +785,20 @@ export async function getSeriesStats(
   const allBooks = await getAllBooksWithNarrators();
   const searchLower = filters?.search?.trim().toLowerCase();
 
+  // Helper: safely get trimmed string
+  const safeString = (value: unknown): string => {
+    if (value == null) return '';
+    return String(value).trim();
+  };
+
   // Group books by series
   const seriesMap = new Map<string, BookSummaryWithNarrators[]>();
   const standaloneBooks: BookSummaryWithNarrators[] = [];
 
   for (const book of allBooks) {
-    if (book.series && book.series.trim()) {
-      const key = book.series;
+    const seriesStr = safeString(book.series);
+    if (seriesStr) {
+      const key = seriesStr;
       if (!seriesMap.has(key)) {
         seriesMap.set(key, []);
       }
@@ -691,11 +808,71 @@ export async function getSeriesStats(
     }
   }
 
+  // Helper: parse series_book_number for numeric sorting (defensive)
+  const parseBookNumber = (value: string | number | null | undefined): number => {
+    if (value == null) return Infinity;
+    const str = String(value).trim();
+    if (!str) return Infinity;
+    const num = parseFloat(str);
+    return isNaN(num) ? Infinity : num;
+  };
+
+  // Helper: find cover book for a series (with defensive try/catch)
+  // Rule: 1) First book (lowest series_book_number, fallback to earliest date_added)
+  //       2) If no cover, fallback to earliest book with cover
+  //       3) For standalone: any book with cover (prefer earliest date_added)
+  const findCoverBook = (
+    books: BookSummaryWithNarrators[],
+    isStandalone: boolean
+  ): { coverBookId: number | null; coverUpdatedAt: string | null } => {
+    try {
+      if (books.length === 0) {
+        return { coverBookId: null, coverUpdatedAt: null };
+      }
+
+      // Sort books: by series_book_number (numeric), then by date_added
+      const sortedBooks = [...books].sort((a, b) => {
+        if (isStandalone) {
+          // For standalone, sort by date_added (earliest first)
+          const dateA = a.date_added || '';
+          const dateB = b.date_added || '';
+          return dateA.localeCompare(dateB);
+        }
+        // For series, sort by book number, then date_added
+        const numA = parseBookNumber(a.series_book_number);
+        const numB = parseBookNumber(b.series_book_number);
+        if (numA !== numB) return numA - numB;
+        const dateA = a.date_added || '';
+        const dateB = b.date_added || '';
+        return dateA.localeCompare(dateB);
+      });
+
+      // Check if first book has cover
+      const firstBook = sortedBooks[0];
+      if (firstBook.cover_image_path) {
+        return { coverBookId: firstBook.id, coverUpdatedAt: firstBook.date_updated || null };
+      }
+
+      // Fallback: find earliest book with cover
+      const booksWithCover = sortedBooks.filter(b => b.cover_image_path);
+      if (booksWithCover.length > 0) {
+        const fallback = booksWithCover[0];
+        return { coverBookId: fallback.id, coverUpdatedAt: fallback.date_updated || null };
+      }
+
+      return { coverBookId: null, coverUpdatedAt: null };
+    } catch (error) {
+      console.error('[DB] Error in findCoverBook:', error);
+      return { coverBookId: null, coverUpdatedAt: null };
+    }
+  };
+
   // Compute stats for each series
   const computeStats = (
     seriesKey: string,
     seriesName: string,
-    books: BookSummaryWithNarrators[]
+    books: BookSummaryWithNarrators[],
+    isStandalone: boolean = false
   ): SeriesStats => {
     const bookCount = books.length;
     const finishedCount = books.filter(b => b.status === 'finished').length;
@@ -725,6 +902,9 @@ export async function getSeriesStats(
       0
     );
 
+    // Find cover book
+    const { coverBookId, coverUpdatedAt } = findCoverBook(books, isStandalone);
+
     return {
       seriesKey,
       seriesName,
@@ -738,6 +918,8 @@ export async function getSeriesStats(
       unratedCount,
       completionStatus,
       completionPercent,
+      coverBookId,
+      coverUpdatedAt,
     };
   };
 
@@ -756,7 +938,7 @@ export async function getSeriesStats(
       }
     }
     const seriesKey = encodeURIComponent(seriesName);
-    seriesStatsList.push(computeStats(seriesKey, seriesName, books));
+    seriesStatsList.push(computeStats(seriesKey, seriesName, books, false));
   });
 
   // Add standalone (only if any standalone book matches search, or no search)
@@ -765,10 +947,10 @@ export async function getSeriesStats(
       const matchingStandalone = standaloneBooks.filter(b => bookMatchesSearch(b, searchLower));
       if (matchingStandalone.length > 0) {
         // Show standalone with stats based on ALL standalone books, but indicate there are matches
-        seriesStatsList.push(computeStats('standalone', 'Standalone Books', standaloneBooks));
+        seriesStatsList.push(computeStats('standalone', 'Standalone Books', standaloneBooks, true));
       }
     } else {
-      seriesStatsList.push(computeStats('standalone', 'Standalone Books', standaloneBooks));
+      seriesStatsList.push(computeStats('standalone', 'Standalone Books', standaloneBooks, true));
     }
   }
 
@@ -882,7 +1064,10 @@ export async function getBooksFiltered(
   // Apply series filter
   if (filters?.seriesKey) {
     if (filters.seriesKey === 'standalone') {
-      books = books.filter(b => !b.series || !b.series.trim());
+      books = books.filter(b => {
+        const seriesStr = b.series == null ? '' : String(b.series).trim();
+        return !seriesStr;
+      });
     } else {
       const seriesName = decodeURIComponent(filters.seriesKey);
       books = books.filter(b => b.series === seriesName);
@@ -963,4 +1148,157 @@ function parseSeriesNumber(value: string | null): number {
   if (!value) return Infinity; // Nulls last
   const num = parseFloat(value);
   return isNaN(num) ? Infinity : num;
+}
+
+// ============ Step 5: Export + Covers ============
+
+// Book data for export (all fields)
+export interface BookExportData {
+  id: number;
+  path: string;
+  type: string;
+  title: string;
+  author: string | null;
+  narrator: string | null;
+  duration_seconds: number | null;
+  has_embedded_cover: boolean | null;
+  total_size_bytes: number | null;
+  file_count: number | null;
+  is_duplicate: boolean | null;
+  series: string | null;
+  series_book_number: string | null;
+  series_ended: boolean | null;
+  series_name_raw: string | null;
+  series_exact_name_raw: string | null;
+  source: string;
+  status: string;
+  book_rating: number | null;
+  tags: string | null;
+  notes: string | null;
+  cover_image_path: string | null;
+  missing_from_csv: boolean;
+  date_added: string;
+  date_updated: string;
+  narratorRatings: Record<string, number | null>;
+}
+
+// Get all books with full data for export
+export async function getBooksForExport(): Promise<BookExportData[]> {
+  await initializeSchema();
+  const database = getDatabase();
+
+  // Get all books
+  const booksResult = await database.execute(`
+    SELECT * FROM books ORDER BY id
+  `);
+
+  // Get all narrator ratings
+  const ratingsResult = await database.execute(`
+    SELECT book_id, narrator_name, rating FROM narrator_ratings
+  `);
+
+  // Build ratings map
+  const ratingsMap = new Map<number, Record<string, number | null>>();
+  for (const row of ratingsResult.rows) {
+    const bookId = row.book_id as number;
+    if (!ratingsMap.has(bookId)) {
+      ratingsMap.set(bookId, {});
+    }
+    ratingsMap.get(bookId)![row.narrator_name as string] = row.rating as number | null;
+  }
+
+  return booksResult.rows.map((row) => ({
+    id: row.id as number,
+    path: row.path as string,
+    type: (row.type as string) || 'Folder',
+    title: row.title as string,
+    author: row.author as string | null,
+    narrator: row.narrator as string | null,
+    duration_seconds: row.duration_seconds as number | null,
+    has_embedded_cover: row.has_embedded_cover === 1,
+    total_size_bytes: row.total_size_bytes as number | null,
+    file_count: row.file_count as number | null,
+    is_duplicate: row.is_duplicate === 1,
+    series: row.series as string | null,
+    series_book_number: row.series_book_number as string | null,
+    series_ended: row.series_ended === 1 ? true : row.series_ended === 0 ? false : null,
+    series_name_raw: row.series_name_raw as string | null,
+    series_exact_name_raw: row.series_exact_name_raw as string | null,
+    source: (row.source as string) || 'csv',
+    status: (row.status as string) || 'not_started',
+    book_rating: row.book_rating as number | null,
+    tags: row.tags as string | null,
+    notes: row.notes as string | null,
+    cover_image_path: row.cover_image_path as string | null,
+    missing_from_csv: row.missing_from_csv === 1,
+    date_added: (row.date_added as string) || '',
+    date_updated: (row.date_updated as string) || '',
+    narratorRatings: ratingsMap.get(row.id as number) || {},
+  }));
+}
+
+// Get books for cover extraction
+export async function getBooksForCoverExtraction(
+  bookIds?: number[],
+  overwrite?: boolean
+): Promise<Array<{ id: number; path: string; type: string; cover_image_path: string | null }>> {
+  await initializeSchema();
+  const database = getDatabase();
+
+  let sql = `
+    SELECT id, path, type, cover_image_path
+    FROM books
+    WHERE has_embedded_cover = 1
+  `;
+  const args: (number | string)[] = [];
+
+  if (!overwrite) {
+    sql += ' AND (cover_image_path IS NULL OR cover_image_path = \'\')';
+  }
+
+  if (bookIds && bookIds.length > 0) {
+    const placeholders = bookIds.map(() => '?').join(',');
+    sql += ` AND id IN (${placeholders})`;
+    args.push(...bookIds);
+  }
+
+  sql += ' ORDER BY id';
+
+  const result = await database.execute({ sql, args });
+
+  return result.rows.map((row) => ({
+    id: row.id as number,
+    path: row.path as string,
+    type: (row.type as string) || 'Folder',
+    cover_image_path: row.cover_image_path as string | null,
+  }));
+}
+
+// Update book cover path
+export async function setBookCoverPath(bookId: number, coverPath: string): Promise<void> {
+  await initializeSchema();
+  const database = getDatabase();
+  const now = new Date().toISOString();
+
+  await database.execute({
+    sql: 'UPDATE books SET cover_image_path = ?, date_updated = ? WHERE id = ?',
+    args: [coverPath, now, bookId]
+  });
+}
+
+// Get book cover path
+export async function getBookCoverPath(bookId: number): Promise<string | null> {
+  await initializeSchema();
+  const database = getDatabase();
+
+  const result = await database.execute({
+    sql: 'SELECT cover_image_path FROM books WHERE id = ?',
+    args: [bookId]
+  });
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0].cover_image_path as string | null;
 }

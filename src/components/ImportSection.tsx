@@ -175,6 +175,9 @@ export default function ImportSection({ initialCsvPath, lastImportAt }: ImportSe
                   <li className="text-green-400">Inserted: {importResult.summary.inserted}</li>
                   <li className="text-blue-400">Updated: {importResult.summary.updated}</li>
                   <li className="text-yellow-400">Skipped: {importResult.summary.skipped}</li>
+                  {importResult.summary.markedMissing > 0 && (
+                    <li className="text-orange-400">Marked missing: {importResult.summary.markedMissing}</li>
+                  )}
                   {importResult.summary.errors > 0 && (
                     <li className="text-red-400">Errors: {importResult.summary.errors}</li>
                   )}
