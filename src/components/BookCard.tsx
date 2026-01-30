@@ -33,12 +33,13 @@ export default function BookCard({ book, seriesKey, libraryUrl }: BookCardProps)
       className="group block bg-netflix-dark rounded-md overflow-hidden hover:scale-105 hover:z-10 transition-transform duration-200"
     >
       {/* Cover image or placeholder */}
-      <div className="aspect-[2/3] bg-netflix-gray flex items-center justify-center relative overflow-hidden">
+      <div className="relative w-full aspect-[2/3] overflow-hidden bg-gray-900 flex items-center justify-center">
         {hasCover ? (
           <img
             src={`/api/covers/${book.id}`}
             alt={book.title}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="max-h-full max-w-full object-contain"
+            loading="lazy"
             onError={() => setImageError(true)}
           />
         ) : (

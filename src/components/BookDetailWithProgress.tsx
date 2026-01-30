@@ -29,12 +29,13 @@ export default function BookDetailWithProgress({ initialBook }: BookDetailWithPr
       {/* Header */}
       <div className="flex gap-6 mb-8">
         {/* Cover image or placeholder */}
-        <div className="flex-shrink-0 w-48 h-72 bg-netflix-gray rounded-md flex items-center justify-center relative overflow-hidden">
+        <div className="flex-shrink-0 w-48 aspect-[2/3] bg-gray-900 rounded-md flex items-center justify-center relative overflow-hidden">
           {hasCover ? (
             <img
               src={`/api/covers/${book.id}`}
               alt={book.title}
-              className="absolute inset-0 w-full h-full object-cover"
+              className="max-h-full max-w-full object-contain"
+              loading="lazy"
               onError={() => setImageError(true)}
             />
           ) : (
