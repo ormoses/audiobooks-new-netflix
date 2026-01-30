@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getBooksFiltered } from '@/lib/db';
 import { BooksWithNarratorsResponse, BookStatus, BookSortField, SortDirection } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest): Promise<NextResponse<BooksWithNarratorsResponse>> {
   try {
     const { searchParams } = new URL(request.url);
