@@ -705,48 +705,99 @@ export interface NeedsRatingDebug {
   returnedCount: number;
 }
 
+export interface NeedsRatingBookDebug {
+  rawBookRatingFromDb: number | null | undefined;
+  narrators: string[];
+  narratorRatings: Record<string, number | null>;
+  missingNarrators: string[];
+  isFullyRated: boolean;
+}
+
+export interface NeedsRatingBookWithDebug extends NeedsRatingBook {
+  debug: NeedsRatingBookDebug;
+}
+
 // Get books that need rating (Finished status but missing book_rating or narrator ratings)
-export async function getNeedsRatingBooks(): Promise<{ books: NeedsRatingBook[]; debug: NeedsRatingDebug }> {
+export async function getNeedsRatingBooks(): Promise<{ books: NeedsRatingBookWithDebug[]; debug: NeedsRatingDebug }> {
   await initializeSchema();
   const database = getDatabase();
 
-  // Get all finished books (lowercase 'finished' as stored in DB)
-  const result = await database.execute(`
-    SELECT id, title, author, series, series_book_number, duration_seconds, narrator, book_rating, status
+  // Step 1: Get all finished books (lowercase 'finished' as stored in DB)
+  const booksResult = await database.execute(`
+    SELECT id, title, author, series, series_book_number, duration_seconds, narrator, book_rating
     FROM books
     WHERE status = 'finished'
     ORDER BY date_updated DESC
   `);
 
-  console.log(`[NeedsRating] Query returned ${result.rows.length} finished books`);
+  console.log(`[NeedsRating] Query returned ${booksResult.rows.length} finished books`);
 
-  const books: NeedsRatingBook[] = [];
+  if (booksResult.rows.length === 0) {
+    return {
+      books: [],
+      debug: { totalFinished: 0, missingBookRatingCount: 0, missingNarratorRatingCount: 0, returnedCount: 0 }
+    };
+  }
+
+  // Step 2: Get ALL book IDs and batch-load narrator ratings in ONE query
+  const bookIds = booksResult.rows.map(row => row.id as number);
+
+  // Build placeholders for IN clause
+  const placeholders = bookIds.map(() => '?').join(',');
+  const ratingsResult = await database.execute({
+    sql: `SELECT book_id, narrator_name, rating FROM narrator_ratings WHERE book_id IN (${placeholders})`,
+    args: bookIds
+  });
+
+  console.log(`[NeedsRating] Loaded ${ratingsResult.rows.length} narrator ratings for ${bookIds.length} books`);
+
+  // Step 3: Build ratings map: bookId -> { narratorName -> rating }
+  const ratingsMap = new Map<number, Record<string, number | null>>();
+  for (const row of ratingsResult.rows) {
+    const bookId = row.book_id as number;
+    const narratorName = row.narrator_name as string;
+    const rating = row.rating as number | null;
+
+    if (!ratingsMap.has(bookId)) {
+      ratingsMap.set(bookId, {});
+    }
+    ratingsMap.get(bookId)![narratorName] = rating;
+  }
+
+  // Step 4: Process each book and check if it needs rating
+  const books: NeedsRatingBookWithDebug[] = [];
   let missingBookRatingCount = 0;
   let missingNarratorRatingCount = 0;
 
-  for (const row of result.rows) {
+  for (const row of booksResult.rows) {
     const bookId = row.id as number;
-    const narrator = row.narrator as string | null;
-    const bookRating = row.book_rating as number | null;
-    const status = row.status as string;
-    const narrators = parseNarrators(narrator);
-    const narratorRatings = await getNarratorRatings(bookId);
+    const narratorString = row.narrator as string | null;
+    const rawBookRating = row.book_rating; // Keep raw value for debug
+    const bookRating = rawBookRating as number | null;
+    const narrators = parseNarrators(narratorString);
+    const narratorRatings = ratingsMap.get(bookId) || {};
 
-    // Debug: log first few books
-    if (books.length < 3) {
-      console.log(`[NeedsRating] Book ${bookId}: status="${status}", book_rating=${bookRating}, narrators=${JSON.stringify(narrators)}, narratorRatings=${JSON.stringify(narratorRatings)}`);
-    }
+    // Find missing narrators (narrators without ratings)
+    const missingNarrators = narrators.filter(n => narratorRatings[n] === undefined || narratorRatings[n] === null);
 
     // Check if book needs rating:
-    // 1. Missing book rating, OR
-    // 2. Has narrators AND at least one narrator is missing rating
-    const missingBookRating = bookRating === null;
-    const missingNarratorRating = narrators.length > 0 && narrators.some(n => narratorRatings[n] === undefined || narratorRatings[n] === null);
+    // Fully rated = book_rating is NOT null AND (no narrators OR all narrators have ratings)
+    const hasBookRating = bookRating !== null;
+    const hasAllNarratorRatings = narrators.length === 0 || missingNarrators.length === 0;
+    const isFullyRated = hasBookRating && hasAllNarratorRatings;
 
-    if (missingBookRating) missingBookRatingCount++;
-    if (missingNarratorRating) missingNarratorRatingCount++;
+    // Book needs rating if NOT fully rated
+    const needsRating = !isFullyRated;
 
-    if (missingBookRating || missingNarratorRating) {
+    if (!hasBookRating) missingBookRatingCount++;
+    if (narrators.length > 0 && missingNarrators.length > 0) missingNarratorRatingCount++;
+
+    // Debug log for specific books
+    if (bookId === 218 || bookId === 96) {
+      console.log(`[NeedsRating] Book ${bookId}: rawBookRating=${JSON.stringify(rawBookRating)}, bookRating=${bookRating}, narrators=${JSON.stringify(narrators)}, narratorRatings=${JSON.stringify(narratorRatings)}, missingNarrators=${JSON.stringify(missingNarrators)}, isFullyRated=${isFullyRated}, needsRating=${needsRating}`);
+    }
+
+    if (needsRating) {
       books.push({
         id: bookId,
         title: row.title as string,
@@ -754,16 +805,23 @@ export async function getNeedsRatingBooks(): Promise<{ books: NeedsRatingBook[];
         series: row.series as string | null,
         series_book_number: row.series_book_number as string | null,
         duration_seconds: row.duration_seconds as number | null,
-        narrator,
+        narrator: narratorString,
         book_rating: bookRating,
         narrators,
-        narratorRatings
+        narratorRatings,
+        debug: {
+          rawBookRatingFromDb: rawBookRating as number | null | undefined,
+          narrators,
+          narratorRatings,
+          missingNarrators,
+          isFullyRated,
+        }
       });
     }
   }
 
   const debug: NeedsRatingDebug = {
-    totalFinished: result.rows.length,
+    totalFinished: booksResult.rows.length,
     missingBookRatingCount,
     missingNarratorRatingCount,
     returnedCount: books.length,

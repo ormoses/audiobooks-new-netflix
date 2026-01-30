@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getNeedsRatingBooks, NeedsRatingDebug } from '@/lib/db';
-import { NeedsRatingBook } from '@/lib/types';
+import { getNeedsRatingBooks, NeedsRatingDebug, NeedsRatingBookWithDebug } from '@/lib/db';
 
+// Force fresh data - no caching, no edge runtime
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
 
 interface NeedsRatingResponseWithDebug {
   ok: boolean;
-  books: NeedsRatingBook[];
+  books: NeedsRatingBookWithDebug[];
   debug?: NeedsRatingDebug;
   error?: string;
 }
@@ -20,7 +22,7 @@ export async function GET(): Promise<NextResponse<NeedsRatingResponseWithDebug>>
     return NextResponse.json({
       ok: true,
       books,
-      debug, // Include debug info in response (can remove later)
+      debug,
     });
   } catch (error) {
     console.error('[API] Error fetching needs-rating books:', error);
