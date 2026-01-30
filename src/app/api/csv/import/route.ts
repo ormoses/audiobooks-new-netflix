@@ -2,8 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseCsvFile } from '@/lib/csv-parser';
 import { upsertBooks, setAppMeta, getAllBookPaths, markMissingBooks } from '@/lib/db';
 import { ImportResponse, ImportSummary } from '@/lib/types';
+import { requireAuth } from '@/lib/auth';
+import { isLocalImportAllowed } from '@/lib/env';
 
-export async function POST(request: NextRequest): Promise<NextResponse<ImportResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse<ImportResponse> | Response> {
+  // Block CSV import in production
+  if (!isLocalImportAllowed()) {
+    return NextResponse.json({
+      ok: false,
+      error: 'CSV import is not available in production. Use the local import script instead.',
+    }, { status: 403 });
+  }
+
+  // Require authentication for mutations
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
   try {
     const body = await request.json();
     const { path } = body;

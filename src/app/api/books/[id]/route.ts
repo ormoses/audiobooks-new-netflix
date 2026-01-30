@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBookWithRatings, updateBook } from '@/lib/db';
 import { BookDetailResponse, BookUpdateRequest, BookUpdateResponse } from '@/lib/types';
+import { requireAuth } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -42,7 +43,13 @@ export async function GET(
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse<BookUpdateResponse>> {
+): Promise<NextResponse<BookUpdateResponse> | Response> {
+  // Require authentication for mutations
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
   try {
     const { id } = await params;
     const bookId = parseInt(id, 10);

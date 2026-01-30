@@ -1,15 +1,17 @@
 {
   "name": "audiobook-catalog",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "import:cloud": "tsx scripts/import-to-turso.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",
+    "dotenv": "^16.4.7",
     "music-metadata": "^11.11.1",
     "next": "^14.2.35",
     "papaparse": "^5.5.3",
@@ -26,6 +28,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
 }

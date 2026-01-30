@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { NeedsRatingBook, NarratorRating } from '@/lib/types';
 import { formatDuration } from '@/lib/formatters';
 import StarRating from './StarRating';
+import { useToast } from './Toast';
 
 export default function NeedsRatingList() {
   const [books, setBooks] = useState<NeedsRatingBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingBookId, setSavingBookId] = useState<number | null>(null);
+  const { showToast } = useToast();
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -42,6 +44,11 @@ export default function NeedsRatingList() {
         body: JSON.stringify({ book_rating: rating }),
       });
 
+      if (response.status === 401) {
+        showToast('Please login to edit', 'error');
+        return;
+      }
+
       if (response.ok) {
         // Update local state
         setBooks((prev) =>
@@ -56,9 +63,13 @@ export default function NeedsRatingList() {
             return !(hasBookRating && hasAllNarratorRatings);
           })
         );
+      } else {
+        const data = await response.json();
+        showToast(data.error || 'Failed to update rating', 'error');
       }
     } catch (err) {
       console.error('Error updating book rating:', err);
+      showToast('Failed to update rating', 'error');
     } finally {
       setSavingBookId(null);
     }
@@ -74,6 +85,11 @@ export default function NeedsRatingList() {
           ratings: [{ narratorName, rating }] as NarratorRating[],
         }),
       });
+
+      if (response.status === 401) {
+        showToast('Please login to edit', 'error');
+        return;
+      }
 
       if (response.ok) {
         // Update local state
@@ -91,9 +107,13 @@ export default function NeedsRatingList() {
             return !(hasBookRating && hasAllNarratorRatings);
           })
         );
+      } else {
+        const data = await response.json();
+        showToast(data.error || 'Failed to update rating', 'error');
       }
     } catch (err) {
       console.error('Error updating narrator rating:', err);
+      showToast('Failed to update rating', 'error');
     } finally {
       setSavingBookId(null);
     }

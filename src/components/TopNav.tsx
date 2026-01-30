@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import LoginButton from './LoginButton';
 
 interface NavItem {
   href: string;
@@ -52,6 +53,9 @@ export default function TopNav() {
               </li>
             );
           })}
+          <li>
+            <LoginButton />
+          </li>
         </ul>
       </nav>
     </header>

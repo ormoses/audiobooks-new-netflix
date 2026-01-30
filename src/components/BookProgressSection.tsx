@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { BookWithRatings, BookStatus, NarratorRating } from '@/lib/types';
 import StatusSelect from './StatusSelect';
 import StarRating from './StarRating';
+import { useToast } from './Toast';
 
 interface BookProgressSectionProps {
   book: BookWithRatings;
@@ -13,6 +14,7 @@ interface BookProgressSectionProps {
 
 export default function BookProgressSection({ book, onUpdate }: BookProgressSectionProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
@@ -30,6 +32,11 @@ export default function BookProgressSection({ book, onUpdate }: BookProgressSect
         body: JSON.stringify(updates),
       });
 
+      if (response.status === 401) {
+        showToast('Please login to edit', 'error');
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         if (data.ok && data.book) {
@@ -41,9 +48,13 @@ export default function BookProgressSection({ book, onUpdate }: BookProgressSect
           showSaveIndicator();
           router.refresh(); // Invalidate router cache for fresh data on re-navigation
         }
+      } else {
+        const data = await response.json();
+        showToast(data.error || 'Failed to update', 'error');
       }
     } catch (error) {
       console.error('Error updating book:', error);
+      showToast('Failed to update', 'error');
     } finally {
       setSaving(false);
     }
@@ -60,6 +71,11 @@ export default function BookProgressSection({ book, onUpdate }: BookProgressSect
         }),
       });
 
+      if (response.status === 401) {
+        showToast('Please login to edit', 'error');
+        return;
+      }
+
       if (response.ok) {
         const newNarratorRatings = {
           ...book.narratorRatings,
@@ -71,9 +87,13 @@ export default function BookProgressSection({ book, onUpdate }: BookProgressSect
         });
         showSaveIndicator();
         router.refresh(); // Invalidate router cache for fresh data on re-navigation
+      } else {
+        const data = await response.json();
+        showToast(data.error || 'Failed to update rating', 'error');
       }
     } catch (error) {
       console.error('Error updating narrator rating:', error);
+      showToast('Failed to update rating', 'error');
     } finally {
       setSaving(false);
     }

@@ -3,10 +3,19 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import { OpenPathResponse } from '@/lib/types';
+import { isProduction } from '@/lib/env';
 
 const execAsync = promisify(exec);
 
 export async function POST(request: NextRequest): Promise<NextResponse<OpenPathResponse>> {
+  // Block in production - only makes sense for local development
+  if (isProduction()) {
+    return NextResponse.json({
+      ok: false,
+      error: 'Open folder is not available in production',
+    }, { status: 403 });
+  }
+
   try {
     const body = await request.json();
     const { path, type } = body;

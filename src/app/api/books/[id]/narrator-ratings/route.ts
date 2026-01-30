@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { upsertNarratorRatings, getBookById } from '@/lib/db';
 import { NarratorRatingsRequest, NarratorRatingsResponse } from '@/lib/types';
+import { requireAuth } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse<NarratorRatingsResponse>> {
+): Promise<NextResponse<NarratorRatingsResponse> | Response> {
+  // Require authentication for mutations
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
   try {
     const { id } = await params;
     const bookId = parseInt(id, 10);

@@ -24,10 +24,12 @@ import {
   SeriesCompletionStatus,
 } from './types';
 import { ParsedBook } from './csv-parser';
+import { isDeployedCloud, hasTursoConfig } from './env';
 
 // Database singleton
 let db: Client | null = null;
 let schemaInitialized = false;
+let dbMode: 'turso' | 'local' | null = null;
 
 function getDatabasePath(): string {
   const configPath = process.env.DATABASE_PATH || './data/app.db';
@@ -41,22 +43,71 @@ function ensureDataDirectory(filePath: string): void {
   }
 }
 
+/**
+ * Database configuration error for production without Turso
+ */
+export class DatabaseConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DatabaseConfigError';
+  }
+}
+
 // Initialize and get database
 export function getDatabase(): Client {
   if (db) {
     return db;
   }
 
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  const tursoToken = process.env.TURSO_AUTH_TOKEN;
+
+  // Vercel deployment: MUST use Turso (no local filesystem persistence)
+  if (isDeployedCloud()) {
+    if (!tursoUrl || !tursoToken) {
+      throw new DatabaseConfigError(
+        'Vercel deployment requires Turso configuration. Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN environment variables.'
+      );
+    }
+
+    db = createClient({
+      url: tursoUrl,
+      authToken: tursoToken,
+    });
+    dbMode = 'turso';
+    console.log('[DB] Connected to Turso (Vercel deployment)');
+    return db;
+  }
+
+  // Non-Vercel: prefer Turso if configured, fallback to local file
+  if (tursoUrl && tursoToken) {
+    db = createClient({
+      url: tursoUrl,
+      authToken: tursoToken,
+    });
+    dbMode = 'turso';
+    console.log('[DB] Connected to Turso');
+    return db;
+  }
+
+  // Local file database (development/local builds only)
   const dbPath = getDatabasePath();
   ensureDataDirectory(dbPath);
 
   db = createClient({
     url: `file:${dbPath}`,
   });
-
-  console.log(`[DB] Database initialized at: ${dbPath}`);
+  dbMode = 'local';
+  console.log(`[DB] Database initialized at: ${dbPath} (local mode)`);
 
   return db;
+}
+
+/**
+ * Get current database mode
+ */
+export function getDatabaseMode(): 'turso' | 'local' | null {
+  return dbMode;
 }
 
 // Get existing columns for a table
@@ -164,16 +215,23 @@ export function closeDatabase(): void {
 }
 
 // Health check function
-export async function checkDatabaseHealth(): Promise<{ ok: boolean; error?: string }> {
+export async function checkDatabaseHealth(): Promise<{ ok: boolean; error?: string; mode?: string }> {
   try {
     await initializeSchema();
     const database = getDatabase();
     const result = await database.execute('SELECT 1 as test');
     if (result.rows.length > 0 && result.rows[0].test === 1) {
-      return { ok: true };
+      return { ok: true, mode: dbMode || 'unknown' };
     }
     return { ok: false, error: 'Unexpected query result' };
   } catch (error) {
+    // Special handling for production configuration errors
+    if (error instanceof DatabaseConfigError) {
+      return {
+        ok: false,
+        error: error.message,
+      };
+    }
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Unknown error'

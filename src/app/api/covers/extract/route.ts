@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBooksForCoverExtraction, setBookCoverPath } from '@/lib/db';
 import { CoverExtractRequest, CoverExtractResponse } from '@/lib/types';
+import { requireAuth } from '@/lib/auth';
+import { isCoverExtractionAllowed } from '@/lib/env';
 import * as mm from 'music-metadata';
 import sharp from 'sharp';
 import fs from 'fs';
@@ -124,7 +126,25 @@ async function extractCover(
   }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse<CoverExtractResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse<CoverExtractResponse> | Response> {
+  // Block cover extraction in production (no persistent filesystem)
+  if (!isCoverExtractionAllowed()) {
+    return NextResponse.json({
+      ok: false,
+      processed: 0,
+      extracted: 0,
+      skipped: 0,
+      errors: 0,
+      error: 'Cover extraction is not available in production. Vercel has no persistent filesystem.',
+    }, { status: 403 });
+  }
+
+  // Require authentication for mutations
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
   try {
     const body: CoverExtractRequest = await request.json();
     const { bookIds, overwrite } = body;
