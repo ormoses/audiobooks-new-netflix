@@ -5,6 +5,8 @@ import CoverExtractionSection from '@/components/CoverExtractionSection';
 import { getAppMeta } from '@/lib/db';
 import { isProduction } from '@/lib/env';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SettingsPage() {
   // Fetch last CSV path and import timestamp from database
   const lastCsvPath = await getAppMeta('last_csv_path');

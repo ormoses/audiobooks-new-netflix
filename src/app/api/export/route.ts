@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getBooksForExport } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 // UTF-8 BOM for Excel compatibility
 const UTF8_BOM = '\uFEFF';
 

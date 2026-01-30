@@ -59,8 +59,9 @@ export function getDatabase(): Client {
     return db;
   }
 
-  const tursoUrl = process.env.TURSO_DATABASE_URL;
-  const tursoToken = process.env.TURSO_AUTH_TOKEN;
+  // Trim env vars to handle copy-paste issues with trailing whitespace/newlines
+  const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
+  const tursoToken = process.env.TURSO_AUTH_TOKEN?.trim();
 
   // Vercel deployment: MUST use Turso (no local filesystem persistence)
   if (isDeployedCloud()) {
