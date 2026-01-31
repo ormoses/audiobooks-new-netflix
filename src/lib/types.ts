@@ -322,3 +322,36 @@ export interface CoverUploadResponse {
   errors: number;
   error?: string;
 }
+
+// ============ Batch Apply Series Ratings ============
+
+// Apply mode for batch operations
+export type ApplyMode = 'missingOnly' | 'overwrite';
+
+// Batch apply request
+export interface SeriesBatchApplyRequest {
+  status?: BookStatus;
+  bookRating?: number | null;       // 1-5 or null to clear
+  narratorRating?: number | null;   // 1-5 or null to clear
+  applyMode: ApplyMode;
+}
+
+// Batch apply response
+export interface SeriesBatchApplyResponse {
+  ok: boolean;
+  updated?: {
+    books: number;
+    statuses: number;
+    bookRatings: number;
+    narratorRatings: number;
+  };
+  error?: string;
+}
+
+// Book data for batch apply preview (client-side computation)
+export interface BatchApplyPreview {
+  totalBooks: number;
+  statusChanges: number;
+  bookRatingChanges: number;
+  narratorRatingChanges: number;
+}

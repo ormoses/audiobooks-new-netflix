@@ -1524,3 +1524,213 @@ export async function getBooksForCoverUpload(
     cover_url: row.cover_url as string | null,
   }));
 }
+
+// ============ Batch Apply Series Ratings ============
+
+// Normalize narrator name for consistent matching
+export function normalizeNarratorName(name: string): string {
+  return name.trim();
+}
+
+// Get books in a series with their ratings (for batch apply)
+export interface BookForBatchApply {
+  id: number;
+  status: BookStatus;
+  book_rating: number | null;
+  narrator: string | null;
+  narrators: string[];
+  narratorRatings: Record<string, number | null>;
+}
+
+export async function getBooksInSeriesWithRatings(
+  seriesKey: string
+): Promise<BookForBatchApply[]> {
+  await initializeSchema();
+  const database = getDatabase();
+
+  // Build WHERE clause based on seriesKey
+  let whereClause: string;
+  const args: (string | number)[] = [];
+
+  if (seriesKey === 'standalone') {
+    whereClause = "WHERE (series IS NULL OR series = '')";
+  } else {
+    const seriesName = decodeURIComponent(seriesKey);
+    whereClause = 'WHERE series = ?';
+    args.push(seriesName);
+  }
+
+  // Get books in series
+  const booksResult = await database.execute({
+    sql: `
+      SELECT id, status, book_rating, narrator
+      FROM books
+      ${whereClause}
+      ORDER BY id
+    `,
+    args,
+  });
+
+  if (booksResult.rows.length === 0) {
+    return [];
+  }
+
+  // Get book IDs for narrator ratings lookup
+  const bookIds = booksResult.rows.map((row) => row.id as number);
+  const placeholders = bookIds.map(() => '?').join(',');
+
+  // Get all narrator ratings for these books
+  const ratingsResult = await database.execute({
+    sql: `SELECT book_id, narrator_name, rating FROM narrator_ratings WHERE book_id IN (${placeholders})`,
+    args: bookIds,
+  });
+
+  // Build ratings map
+  const ratingsMap = new Map<number, Record<string, number | null>>();
+  for (const row of ratingsResult.rows) {
+    const bookId = row.book_id as number;
+    if (!ratingsMap.has(bookId)) {
+      ratingsMap.set(bookId, {});
+    }
+    ratingsMap.get(bookId)![row.narrator_name as string] = row.rating as number | null;
+  }
+
+  // Build result
+  return booksResult.rows.map((row) => {
+    const bookId = row.id as number;
+    const narrator = row.narrator as string | null;
+    const narrators = parseNarrators(narrator);
+    const narratorRatings = ratingsMap.get(bookId) || {};
+
+    return {
+      id: bookId,
+      status: (row.status as BookStatus) || 'not_started',
+      book_rating: row.book_rating as number | null,
+      narrator,
+      narrators,
+      narratorRatings,
+    };
+  });
+}
+
+// Batch apply ratings to all books in a series
+export interface BatchApplyPayload {
+  status?: BookStatus;
+  bookRating?: number | null;
+  narratorRating?: number | null;
+  applyMode: 'missingOnly' | 'overwrite';
+}
+
+export interface BatchApplyResult {
+  books: number;
+  statuses: number;
+  bookRatings: number;
+  narratorRatings: number;
+}
+
+export async function batchApplySeriesRatings(
+  seriesKey: string,
+  payload: BatchApplyPayload
+): Promise<BatchApplyResult> {
+  await initializeSchema();
+  const database = getDatabase();
+
+  const books = await getBooksInSeriesWithRatings(seriesKey);
+  const now = new Date().toISOString();
+  const isMissingOnly = payload.applyMode === 'missingOnly';
+
+  let statusCount = 0;
+  let bookRatingCount = 0;
+  let narratorRatingCount = 0;
+
+  for (const book of books) {
+    const updates: string[] = [];
+    const updateArgs: (string | number | null)[] = [];
+
+    // Status update
+    if (payload.status !== undefined) {
+      if (!isMissingOnly || book.status !== payload.status) {
+        updates.push('status = ?');
+        updateArgs.push(payload.status);
+        statusCount++;
+      }
+    }
+
+    // Book rating update
+    if (payload.bookRating !== undefined) {
+      if (isMissingOnly) {
+        // Only set if currently null (for setting a rating)
+        // Or only clear if currently not null (for clearing)
+        if (payload.bookRating !== null && book.book_rating === null) {
+          updates.push('book_rating = ?');
+          updateArgs.push(payload.bookRating);
+          bookRatingCount++;
+        } else if (payload.bookRating === null && book.book_rating !== null) {
+          updates.push('book_rating = ?');
+          updateArgs.push(null);
+          bookRatingCount++;
+        }
+      } else {
+        // Overwrite mode: always apply
+        updates.push('book_rating = ?');
+        updateArgs.push(payload.bookRating);
+        bookRatingCount++;
+      }
+    }
+
+    // Execute book update if there are changes
+    if (updates.length > 0) {
+      updates.push('date_updated = ?');
+      updateArgs.push(now);
+      updateArgs.push(book.id);
+
+      await database.execute({
+        sql: `UPDATE books SET ${updates.join(', ')} WHERE id = ?`,
+        args: updateArgs,
+      });
+    }
+
+    // Narrator rating updates
+    if (payload.narratorRating !== undefined && book.narrators.length > 0) {
+      for (const narrator of book.narrators) {
+        const normalizedName = normalizeNarratorName(narrator);
+        const currentRating = book.narratorRatings[normalizedName];
+
+        let shouldUpdate = false;
+
+        if (isMissingOnly) {
+          // Only set if missing/null, or clear if exists
+          if (payload.narratorRating !== null && (currentRating === undefined || currentRating === null)) {
+            shouldUpdate = true;
+          } else if (payload.narratorRating === null && currentRating !== undefined && currentRating !== null) {
+            shouldUpdate = true;
+          }
+        } else {
+          // Overwrite mode: always apply
+          shouldUpdate = true;
+        }
+
+        if (shouldUpdate) {
+          await database.execute({
+            sql: `
+              INSERT INTO narrator_ratings (book_id, narrator_name, rating, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?)
+              ON CONFLICT(book_id, narrator_name) DO UPDATE SET
+                rating = excluded.rating,
+                updated_at = excluded.updated_at
+            `,
+            args: [book.id, normalizedName, payload.narratorRating, now, now],
+          });
+          narratorRatingCount++;
+        }
+      }
+    }
+  }
+
+  return {
+    books: books.length,
+    statuses: statusCount,
+    bookRatings: bookRatingCount,
+    narratorRatings: narratorRatingCount,
+  };
+}
