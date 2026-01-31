@@ -2,6 +2,7 @@ import PageHeader from '@/components/PageHeader';
 import ImportSection from '@/components/ImportSection';
 import ExportSection from '@/components/ExportSection';
 import CoverExtractionSection from '@/components/CoverExtractionSection';
+import CoverUploadSection from '@/components/CoverUploadSection';
 import { getAppMeta } from '@/lib/db';
 import { isProduction } from '@/lib/env';
 
@@ -64,13 +65,16 @@ export default async function SettingsPage() {
           </section>
         )}
 
+        {/* Cover Upload Section - Only show in local mode (needs local file access) */}
+        {!isProd && <CoverUploadSection />}
+
         {/* About Section */}
         <section className="bg-netflix-dark rounded-lg p-6">
           <h2 className="text-xl font-semibold text-white mb-2">
             About
           </h2>
           <p className="text-netflix-light-gray">
-            AudioBooks Catalog v0.4.0
+            AudioBooks Catalog v0.5.0
           </p>
           <p className="text-netflix-light-gray text-sm mt-2">
             A Netflix-style audiobook discovery and tracking app.

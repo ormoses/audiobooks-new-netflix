@@ -22,7 +22,9 @@ export default function BookDetailWithProgress({ initialBook }: BookDetailWithPr
     setImageError(false); // Reset image error on book change
   }, [initialBook]);
 
-  const hasCover = book.cover_image_path && !imageError;
+  // Use cover_url if available (cloud), otherwise fall back to API endpoint (local)
+  const hasCover = (book.cover_url || book.cover_image_path) && !imageError;
+  const coverSrc = book.cover_url || `/api/covers/${book.id}`;
 
   return (
     <>
@@ -32,7 +34,7 @@ export default function BookDetailWithProgress({ initialBook }: BookDetailWithPr
         <div className="flex-shrink-0 w-48 aspect-[2/3] bg-gray-900 rounded-md flex items-center justify-center relative overflow-hidden">
           {hasCover ? (
             <img
-              src={`/api/covers/${book.id}`}
+              src={coverSrc}
               alt={book.title}
               className="max-h-full max-w-full object-contain"
               loading="lazy"

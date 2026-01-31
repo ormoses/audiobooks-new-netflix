@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBookCoverPath } from '@/lib/db';
+import { getBookCoverPath, getBookCoverUrl } from '@/lib/db';
+import { isDeployedCloud } from '@/lib/env';
 import fs from 'fs';
 import path from 'path';
 
@@ -19,7 +20,24 @@ export async function GET(
       return new NextResponse('Invalid book ID', { status: 400 });
     }
 
-    // Get cover path from database
+    // First check for cloud URL (works on Vercel and local)
+    const coverUrl = await getBookCoverUrl(bookId);
+    if (coverUrl) {
+      // Redirect to Vercel Blob URL
+      return NextResponse.redirect(coverUrl, {
+        status: 302,
+        headers: {
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+
+    // On Vercel without cloud URL, no cover available
+    if (isDeployedCloud()) {
+      return new NextResponse('No cloud cover available', { status: 404 });
+    }
+
+    // Local mode: try to serve from filesystem
     const coverPath = await getBookCoverPath(bookId);
 
     if (!coverPath) {

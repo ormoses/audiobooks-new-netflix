@@ -32,6 +32,8 @@ export interface Book {
   missing_from_csv: boolean;
   date_added: string;
   date_updated: string;
+  // Step 6 fields (Vercel Blob cloud covers)
+  cover_url: string | null;
 }
 
 // Book for grid display (subset of fields)
@@ -49,6 +51,8 @@ export interface BookSummary {
   // Step 5 fields
   cover_image_path: string | null;
   missing_from_csv: boolean;
+  // Step 6 fields (Vercel Blob cloud covers)
+  cover_url: string | null;
 }
 
 // Narrator rating record
@@ -250,6 +254,7 @@ export interface SeriesStats {
   completionPercent: number; // finishedCount / bookCount * 100
   coverBookId: number | null; // Book ID to use for series cover
   coverUpdatedAt: string | null; // For cache-busting
+  coverUrl: string | null; // Vercel Blob URL for cloud covers
 }
 
 // Extended book summary with narrator info for filtering
@@ -299,4 +304,21 @@ export interface CoverExtractResponse {
 export interface ExportInfo {
   totalBooks: number;
   exportedAt: string;
+}
+
+// ============ Step 6: Cloud Cover Upload ============
+
+// Cover upload request (upload local covers to Vercel Blob)
+export interface CoverUploadRequest {
+  bookIds?: number[]; // If empty, upload all books with local covers but no cover_url
+}
+
+// Cover upload response
+export interface CoverUploadResponse {
+  ok: boolean;
+  processed: number;
+  uploaded: number;
+  skipped: number;
+  errors: number;
+  error?: string;
 }

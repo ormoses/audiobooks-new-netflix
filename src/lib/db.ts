@@ -283,7 +283,7 @@ export async function getBooks(search?: string): Promise<BookSummary[]> {
 
   let sql = `
     SELECT id, title, author, series, series_book_number, duration_seconds, is_duplicate,
-           status, book_rating, cover_image_path, missing_from_csv
+           status, book_rating, cover_image_path, cover_url, missing_from_csv
     FROM books
   `;
   const args: (string | number)[] = [];
@@ -314,6 +314,7 @@ export async function getBooks(search?: string): Promise<BookSummary[]> {
     status: (row.status as BookStatus) || 'not_started',
     book_rating: row.book_rating as number | null,
     cover_image_path: row.cover_image_path as string | null,
+    cover_url: row.cover_url as string | null,
     missing_from_csv: row.missing_from_csv === 1,
   }));
 }
@@ -359,6 +360,7 @@ export async function getBookById(id: number): Promise<Book | null> {
     missing_from_csv: row.missing_from_csv === 1,
     date_added: (row.date_added as string) || new Date().toISOString(),
     date_updated: (row.date_updated as string) || new Date().toISOString(),
+    cover_url: row.cover_url as string | null,
   };
 }
 
@@ -866,7 +868,7 @@ export async function getAllBooksWithNarrators(): Promise<BookSummaryWithNarrato
   const booksResult = await database.execute(`
     SELECT id, title, author, series, series_book_number, duration_seconds,
            is_duplicate, status, book_rating, narrator, date_added, date_updated,
-           cover_image_path, missing_from_csv
+           cover_image_path, cover_url, missing_from_csv
     FROM books
     ORDER BY id
   `);
@@ -905,6 +907,7 @@ export async function getAllBooksWithNarrators(): Promise<BookSummaryWithNarrato
       status: (row.status as BookStatus) || 'not_started',
       book_rating: row.book_rating as number | null,
       cover_image_path: row.cover_image_path as string | null,
+      cover_url: row.cover_url as string | null,
       missing_from_csv: row.missing_from_csv === 1,
       narrator,
       narrators,
@@ -970,10 +973,10 @@ export async function getSeriesStats(
   const findCoverBook = (
     books: BookSummaryWithNarrators[],
     isStandalone: boolean
-  ): { coverBookId: number | null; coverUpdatedAt: string | null } => {
+  ): { coverBookId: number | null; coverUpdatedAt: string | null; coverUrl: string | null } => {
     try {
       if (books.length === 0) {
-        return { coverBookId: null, coverUpdatedAt: null };
+        return { coverBookId: null, coverUpdatedAt: null, coverUrl: null };
       }
 
       // Sort books: by series_book_number (numeric), then by date_added
@@ -993,23 +996,31 @@ export async function getSeriesStats(
         return dateA.localeCompare(dateB);
       });
 
-      // Check if first book has cover
+      // Check if first book has cover (cloud URL or local path)
       const firstBook = sortedBooks[0];
-      if (firstBook.cover_image_path) {
-        return { coverBookId: firstBook.id, coverUpdatedAt: firstBook.date_updated || null };
+      if (firstBook.cover_url || firstBook.cover_image_path) {
+        return {
+          coverBookId: firstBook.id,
+          coverUpdatedAt: firstBook.date_updated || null,
+          coverUrl: firstBook.cover_url || null,
+        };
       }
 
       // Fallback: find earliest book with cover
-      const booksWithCover = sortedBooks.filter(b => b.cover_image_path);
+      const booksWithCover = sortedBooks.filter(b => b.cover_url || b.cover_image_path);
       if (booksWithCover.length > 0) {
         const fallback = booksWithCover[0];
-        return { coverBookId: fallback.id, coverUpdatedAt: fallback.date_updated || null };
+        return {
+          coverBookId: fallback.id,
+          coverUpdatedAt: fallback.date_updated || null,
+          coverUrl: fallback.cover_url || null,
+        };
       }
 
-      return { coverBookId: null, coverUpdatedAt: null };
+      return { coverBookId: null, coverUpdatedAt: null, coverUrl: null };
     } catch (error) {
       console.error('[DB] Error in findCoverBook:', error);
-      return { coverBookId: null, coverUpdatedAt: null };
+      return { coverBookId: null, coverUpdatedAt: null, coverUrl: null };
     }
   };
 
@@ -1049,7 +1060,7 @@ export async function getSeriesStats(
     );
 
     // Find cover book
-    const { coverBookId, coverUpdatedAt } = findCoverBook(books, isStandalone);
+    const { coverBookId, coverUpdatedAt, coverUrl } = findCoverBook(books, isStandalone);
 
     return {
       seriesKey,
@@ -1066,6 +1077,7 @@ export async function getSeriesStats(
       completionPercent,
       coverBookId,
       coverUpdatedAt,
+      coverUrl,
     };
   };
 
@@ -1447,4 +1459,68 @@ export async function getBookCoverPath(bookId: number): Promise<string | null> {
   }
 
   return result.rows[0].cover_image_path as string | null;
+}
+
+// ============ Step 6: Cloud Cover URL Operations ============
+
+// Get book cover URL (Vercel Blob)
+export async function getBookCoverUrl(bookId: number): Promise<string | null> {
+  await initializeSchema();
+  const database = getDatabase();
+
+  const result = await database.execute({
+    sql: 'SELECT cover_url FROM books WHERE id = ?',
+    args: [bookId]
+  });
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0].cover_url as string | null;
+}
+
+// Set book cover URL (Vercel Blob)
+export async function setBookCoverUrl(bookId: number, coverUrl: string): Promise<void> {
+  await initializeSchema();
+  const database = getDatabase();
+  const now = new Date().toISOString();
+
+  await database.execute({
+    sql: 'UPDATE books SET cover_url = ?, date_updated = ? WHERE id = ?',
+    args: [coverUrl, now, bookId]
+  });
+}
+
+// Get books for cover upload (have local cover but no cloud URL)
+export async function getBooksForCoverUpload(
+  bookIds?: number[]
+): Promise<Array<{ id: number; cover_image_path: string; cover_url: string | null }>> {
+  await initializeSchema();
+  const database = getDatabase();
+
+  let sql = `
+    SELECT id, cover_image_path, cover_url
+    FROM books
+    WHERE cover_image_path IS NOT NULL
+      AND cover_image_path != ''
+      AND (cover_url IS NULL OR cover_url = '')
+  `;
+  const args: number[] = [];
+
+  if (bookIds && bookIds.length > 0) {
+    const placeholders = bookIds.map(() => '?').join(',');
+    sql += ` AND id IN (${placeholders})`;
+    args.push(...bookIds);
+  }
+
+  sql += ' ORDER BY id';
+
+  const result = await database.execute({ sql, args });
+
+  return result.rows.map((row) => ({
+    id: row.id as number,
+    cover_image_path: row.cover_image_path as string,
+    cover_url: row.cover_url as string | null,
+  }));
 }

@@ -1,7 +1,7 @@
 // Database schema definitions
 // This file is server-only
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 // Valid status values - matches database CHECK constraint
 export const BOOK_STATUSES = ['not_started', 'in_progress', 'finished'] as const;
@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS books (
   tags TEXT,
   notes TEXT,
   cover_image_path TEXT,
+  cover_url TEXT,
   missing_from_csv INTEGER DEFAULT 0,
   date_added TEXT DEFAULT CURRENT_TIMESTAMP,
   date_updated TEXT DEFAULT CURRENT_TIMESTAMP
@@ -111,6 +112,8 @@ export const migrationColumns: Array<{ column: string; definition: string }> = [
   // Step 5 columns
   { column: 'cover_image_path', definition: 'TEXT' },
   { column: 'missing_from_csv', definition: 'INTEGER DEFAULT 0' },
+  // Step 6 columns (Vercel Blob cloud covers)
+  { column: 'cover_url', definition: 'TEXT' },
 ];
 
 // Migration: Add columns that might be missing from narrator_ratings table

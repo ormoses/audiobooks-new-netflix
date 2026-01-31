@@ -15,11 +15,12 @@ export default function SeriesCard({ series, libraryUrl }: SeriesCardProps) {
   const [imageError, setImageError] = useState(false);
   const duration = formatDuration(series.totalDurationSeconds);
   const isStandalone = series.seriesKey === 'standalone';
-  const hasCover = series.coverBookId !== null && !imageError;
+  // Has cover if we have a cloud URL or a cover book ID
+  const hasCover = (series.coverUrl || series.coverBookId !== null) && !imageError;
 
-  // Build cover URL with cache-busting
-  const coverUrl = hasCover
-    ? `/api/covers/${series.coverBookId}?v=${encodeURIComponent(series.coverUpdatedAt ?? '')}`
+  // Use cover_url if available (cloud), otherwise fall back to API endpoint (local)
+  const coverSrc = hasCover
+    ? series.coverUrl || `/api/covers/${series.coverBookId}?v=${encodeURIComponent(series.coverUpdatedAt ?? '')}`
     : null;
 
   // Build href with from parameter to preserve library state
@@ -43,9 +44,9 @@ export default function SeriesCard({ series, libraryUrl }: SeriesCardProps) {
     >
       {/* Cover image or placeholder */}
       <div className="relative w-full aspect-[2/3] overflow-hidden bg-gray-900 flex items-center justify-center">
-        {coverUrl ? (
+        {coverSrc ? (
           <img
-            src={coverUrl}
+            src={coverSrc}
             alt={series.seriesName}
             className="max-h-full max-w-full object-contain"
             loading="lazy"

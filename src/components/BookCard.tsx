@@ -16,7 +16,9 @@ interface BookCardProps {
 export default function BookCard({ book, seriesKey, libraryUrl }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
   const duration = formatDuration(book.duration_seconds);
-  const hasCover = book.cover_image_path && !imageError;
+  // Use cover_url if available (cloud), otherwise fall back to API endpoint (local)
+  const hasCover = (book.cover_url || book.cover_image_path) && !imageError;
+  const coverSrc = book.cover_url || `/api/covers/${book.id}`;
 
   // Build href with navigation context
   let href = `/book/${book.id}`;
@@ -36,7 +38,7 @@ export default function BookCard({ book, seriesKey, libraryUrl }: BookCardProps)
       <div className="relative w-full aspect-[2/3] overflow-hidden bg-gray-900 flex items-center justify-center">
         {hasCover ? (
           <img
-            src={`/api/covers/${book.id}`}
+            src={coverSrc}
             alt={book.title}
             className="max-h-full max-w-full object-contain"
             loading="lazy"
