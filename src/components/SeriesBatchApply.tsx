@@ -210,23 +210,22 @@ export default function SeriesBatchApply({
       <div
         ref={drawerRef}
         className="
-          absolute bg-netflix-dark
+          absolute bg-netflix-dark flex flex-col
           md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2
-          md:rounded-xl md:max-w-lg md:w-full md:max-h-[90vh]
+          md:rounded-xl md:max-w-lg md:w-full
           bottom-0 left-0 right-0 md:bottom-auto
           rounded-t-2xl md:rounded-b-xl
           animate-slide-up md:animate-fade-in
-          overflow-y-auto
+          max-h-[85vh] md:max-h-[80vh]
         "
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
       >
         {/* Handle bar (mobile only) */}
-        <div className="flex justify-center py-3 md:hidden">
+        <div className="flex-shrink-0 flex justify-center py-3 md:hidden">
           <div className="w-10 h-1 bg-netflix-gray rounded-full" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 md:px-6 pb-4 pt-0 md:pt-6 border-b border-netflix-gray/50">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 md:px-6 pb-4 pt-0 md:pt-6 border-b border-netflix-gray/50">
           <div>
             <h2 className="text-lg font-semibold text-white">Batch Apply</h2>
             <p className="text-sm text-netflix-light-gray mt-1 truncate max-w-[250px] md:max-w-none">
@@ -244,8 +243,8 @@ export default function SeriesBatchApply({
           </button>
         </div>
 
-        {/* Form */}
-        <div className="p-4 md:p-6 space-y-6">
+        {/* Form - scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
           {/* Status */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -404,7 +403,10 @@ export default function SeriesBatchApply({
         </div>
 
         {/* Footer */}
-        <div className="p-4 md:p-6 border-t border-netflix-gray/50 flex gap-3">
+        <div
+          className="flex-shrink-0 p-4 md:p-6 border-t border-netflix-gray/50 flex gap-3"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 16px), 16px)' }}
+        >
           <button
             onClick={onClose}
             className="flex-1 py-3 px-4 bg-netflix-gray text-white font-medium rounded-lg min-h-[48px] hover:bg-gray-600 transition-colors"
