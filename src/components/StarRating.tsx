@@ -25,6 +25,9 @@ export default function StarRating({
     lg: 'w-6 h-6',
   };
 
+  // Touch target padding (larger on mobile for easier tapping)
+  const touchPadding = readonly ? '' : 'p-1.5 md:p-1 -m-1.5 md:-m-1';
+
   const displayRating = hoverRating ?? rating ?? 0;
 
   const handleClick = (starIndex: number) => {
@@ -59,7 +62,8 @@ export default function StarRating({
             onMouseLeave={handleMouseLeave}
             disabled={readonly}
             className={`
-              ${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'}
+              ${touchPadding}
+              ${readonly ? 'cursor-default' : 'cursor-pointer md:hover:scale-110 active:scale-95'}
               transition-transform duration-100
               focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 rounded
               disabled:cursor-default

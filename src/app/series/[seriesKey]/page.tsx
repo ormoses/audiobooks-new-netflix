@@ -41,12 +41,12 @@ export default async function SeriesDetailPage({ params, searchParams }: SeriesD
       {/* Back link */}
       <Link
         href={backHref}
-        className="inline-flex items-center gap-2 text-netflix-light-gray hover:text-white mb-6 transition-colors"
+        className="inline-flex items-center gap-2 px-3 py-2 md:px-0 md:py-0 rounded-lg bg-netflix-gray md:bg-transparent text-netflix-light-gray hover:text-white mb-6 transition-colors min-h-[44px]"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Back to Library
+        <span className="text-sm md:text-base">Back to Library</span>
       </Link>
 
       {/* Header */}

@@ -16,6 +16,7 @@ import SeriesGrid from './SeriesGrid';
 import ViewToggle from './ViewToggle';
 import FilterPanel from './FilterPanel';
 import SortDropdown from './SortDropdown';
+import MobileFilterBar from './MobileFilterBar';
 import Link from 'next/link';
 
 interface LibraryClientProps {
@@ -230,25 +231,42 @@ export default function LibraryClient({ initialBooks, initialTotal }: LibraryCli
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Top bar: View toggle + Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <ViewToggle view={view} onChange={handleViewChange} />
-        <div className="flex-1 max-w-xl">
-          <SearchBar
-            onSearch={handleSearch}
-            initialValue={searchQuery}
-            placeholder={
-              view === 'books'
-                ? 'Search by title, author, series, or narrator...'
-                : 'Search series by name, book title, author, or narrator...'
-            }
-          />
+      <div className="sticky top-0 z-20 md:static bg-netflix-black pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 pt-2 md:pt-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4">
+          <ViewToggle view={view} onChange={handleViewChange} />
+          <div className="flex-1 md:max-w-xl">
+            <SearchBar
+              onSearch={handleSearch}
+              initialValue={searchQuery}
+              placeholder={
+                view === 'books'
+                  ? 'Search by title, author, series, or narrator...'
+                  : 'Search series by name, book title, author, or narrator...'
+              }
+            />
+          </div>
         </div>
       </div>
 
-      {/* Filters and Sort */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Mobile Filters and Sort */}
+      <MobileFilterBar
+        view={view}
+        statuses={statuses}
+        bookRatingFilter={bookRatingFilter}
+        onStatusChange={handleStatusChange}
+        onBookRatingFilterChange={handleBookRatingFilterChange}
+        seriesRatingFilter={seriesRatingFilter}
+        completionStatus={completionStatus}
+        onSeriesRatingFilterChange={handleSeriesRatingFilterChange}
+        onCompletionStatusChange={handleCompletionStatusChange}
+        sort={view === 'books' ? sort : seriesSort}
+        onSortChange={handleSortChange}
+      />
+
+      {/* Desktop Filters and Sort */}
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {view === 'books' ? (
           <FilterPanel
             view="books"

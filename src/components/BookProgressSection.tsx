@@ -153,9 +153,9 @@ export default function BookProgressSection({ book, onUpdate }: BookProgressSect
           </label>
           <div className="space-y-3">
             {book.narrators.map((narrator) => (
-              <div key={narrator} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
-                <span className="text-white text-sm">{narrator}</span>
-                <div className="flex items-center gap-3">
+              <div key={narrator} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-gray-800 rounded-lg px-4 py-3">
+                <span className="text-white text-sm truncate">{narrator}</span>
+                <div className="flex items-center justify-end gap-3">
                   <StarRating
                     rating={book.narratorRatings[narrator] ?? null}
                     onChange={(rating) => updateNarratorRating(narrator, rating)}

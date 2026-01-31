@@ -24,7 +24,7 @@ export default function StatusSelect({ status, onChange, disabled = false }: Sta
         bg-gray-700 text-white text-sm rounded-lg
         border border-gray-600
         focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-        px-3 py-2
+        px-4 py-3 min-h-[48px]
         cursor-pointer
         disabled:opacity-50 disabled:cursor-not-allowed
       "

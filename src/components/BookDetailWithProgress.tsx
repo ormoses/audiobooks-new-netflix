@@ -29,9 +29,9 @@ export default function BookDetailWithProgress({ initialBook }: BookDetailWithPr
   return (
     <>
       {/* Header */}
-      <div className="flex gap-6 mb-8">
+      <div className="flex flex-col md:flex-row gap-6 mb-8">
         {/* Cover image or placeholder */}
-        <div className="flex-shrink-0 w-48 aspect-[2/3] bg-gray-900 rounded-md flex items-center justify-center relative overflow-hidden">
+        <div className="flex-shrink-0 w-40 md:w-48 mx-auto md:mx-0 aspect-[2/3] bg-gray-900 rounded-md flex items-center justify-center relative overflow-hidden">
           {hasCover ? (
             <img
               src={coverSrc}
@@ -70,16 +70,16 @@ export default function BookDetailWithProgress({ initialBook }: BookDetailWithPr
         </div>
 
         {/* Info */}
-        <div className="flex-1 min-w-0">
-          <h1 className="text-3xl font-bold text-white mb-2">{book.title}</h1>
+        <div className="flex-1 min-w-0 text-center md:text-left">
+          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{book.title}</h1>
 
           {book.author && (
-            <p className="text-xl text-netflix-light-gray mb-4">by {book.author}</p>
+            <p className="text-lg md:text-xl text-netflix-light-gray mb-4">by {book.author}</p>
           )}
 
           {/* Series info */}
           {book.series && (
-            <div className="mb-4">
+            <div className="mb-4 flex justify-center md:justify-start">
               <span className="inline-flex items-center gap-2 px-3 py-1 bg-netflix-gray rounded-full text-sm">
                 <span className="text-netflix-light-gray">{book.series}</span>
                 {book.series_book_number && (
@@ -108,7 +108,7 @@ export default function BookDetailWithProgress({ initialBook }: BookDetailWithPr
           </p>
 
           {/* Badges */}
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-6">
             {book.is_duplicate && (
               <span className="px-2 py-1 bg-yellow-600 text-white text-xs font-medium rounded">
                 Duplicate

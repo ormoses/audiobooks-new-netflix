@@ -13,7 +13,7 @@ export default function SeriesGrid({ series, loading, libraryUrl }: SeriesGridPr
   if (loading) {
     // Loading skeleton
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
         {Array.from({ length: 12 }).map((_, i) => (
           <div key={i} className="animate-pulse">
             <div className="aspect-[2/3] bg-netflix-gray rounded-md" />
@@ -34,7 +34,7 @@ export default function SeriesGrid({ series, loading, libraryUrl }: SeriesGridPr
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
       {series.map(s => (
         <SeriesCard key={s.seriesKey} series={s} libraryUrl={libraryUrl} />
       ))}

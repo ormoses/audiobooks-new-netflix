@@ -74,7 +74,7 @@ export default async function SettingsPage() {
             About
           </h2>
           <p className="text-netflix-light-gray">
-            AudioBooks Catalog v0.5.0
+            AudioBooks Catalog v0.6.0
           </p>
           <p className="text-netflix-light-gray text-sm mt-2">
             A Netflix-style audiobook discovery and tracking app.

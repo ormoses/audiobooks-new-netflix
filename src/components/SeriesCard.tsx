@@ -40,7 +40,7 @@ export default function SeriesCard({ series, libraryUrl }: SeriesCardProps) {
   return (
     <Link
       href={href}
-      className="group block bg-netflix-dark rounded-md overflow-hidden hover:scale-105 hover:z-10 transition-transform duration-200"
+      className="group block bg-netflix-dark rounded-md overflow-hidden md:hover:scale-105 md:hover:z-10 active:scale-[0.98] transition-transform duration-200"
     >
       {/* Cover image or placeholder */}
       <div className="relative w-full aspect-[2/3] overflow-hidden bg-gray-900 flex items-center justify-center">
@@ -109,8 +109,8 @@ export default function SeriesCard({ series, libraryUrl }: SeriesCardProps) {
           />
         </div>
 
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        {/* Hover overlay - desktop only */}
+        <div className="hidden md:flex absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center">
           <span className="text-white font-medium">View Series</span>
         </div>
       </div>

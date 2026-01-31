@@ -218,19 +218,21 @@ export default function NeedsRatingList() {
             {/* Rating controls */}
             <div className="mt-4 space-y-3">
               {/* Book rating */}
-              <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-gray-800 rounded-lg px-4 py-3">
                 <span className="text-white text-sm flex items-center gap-2">
                   Book Rating
                   {missingBookRating && (
                     <span className="text-xs text-yellow-400">Needs rating</span>
                   )}
                 </span>
-                <StarRating
-                  rating={book.book_rating}
-                  onChange={(rating) => updateBookRating(book.id, rating)}
-                  size="md"
-                  showClear
-                />
+                <div className="flex justify-end">
+                  <StarRating
+                    rating={book.book_rating}
+                    onChange={(rating) => updateBookRating(book.id, rating)}
+                    size="md"
+                    showClear
+                  />
+                </div>
               </div>
 
               {/* Narrator ratings */}
@@ -240,20 +242,22 @@ export default function NeedsRatingList() {
                 return (
                   <div
                     key={narrator}
-                    className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-gray-800 rounded-lg px-4 py-3"
                   >
-                    <span className="text-white text-sm flex items-center gap-2">
+                    <span className="text-white text-sm flex items-center gap-2 truncate">
                       {narrator}
                       {needsRating && (
-                        <span className="text-xs text-yellow-400">Needs rating</span>
+                        <span className="text-xs text-yellow-400 flex-shrink-0">Needs rating</span>
                       )}
                     </span>
-                    <StarRating
-                      rating={book.narratorRatings[narrator] ?? null}
-                      onChange={(rating) => updateNarratorRating(book.id, narrator, rating)}
-                      size="md"
-                      showClear
-                    />
+                    <div className="flex justify-end">
+                      <StarRating
+                        rating={book.narratorRatings[narrator] ?? null}
+                        onChange={(rating) => updateNarratorRating(book.id, narrator, rating)}
+                        size="md"
+                        showClear
+                      />
+                    </div>
                   </div>
                 );
               })}
