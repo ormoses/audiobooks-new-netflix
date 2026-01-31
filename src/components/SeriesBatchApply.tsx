@@ -204,13 +204,13 @@ export default function SeriesBatchApply({
 
   return (
     <>
-      {/* Overlay - fixed, covers viewport, centers modal */}
+      {/* Overlay - fixed, covers viewport, stretches on mobile, centers on desktop */}
       <div
-        className="fixed inset-0 z-50 bg-black/70 flex items-end md:items-center justify-center p-0 md:p-4"
+        className="fixed inset-0 z-50 bg-black/70 flex justify-center items-stretch md:items-center p-0 md:p-4"
         style={{ height: '100dvh' }}
         onClick={onClose}
       >
-        {/* Modal card - flex column, constrained height */}
+        {/* Modal card - full height on mobile, constrained on desktop */}
         <div
           className="
             w-full md:max-w-lg
@@ -218,9 +218,9 @@ export default function SeriesBatchApply({
             rounded-t-2xl md:rounded-xl
             shadow-2xl
             flex flex-col
+            h-[100svh] md:h-auto md:max-h-[calc(100dvh-24px)]
             animate-slide-up md:animate-fade-in
           "
-          style={{ maxHeight: 'calc(100dvh - 24px)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Handle bar (mobile only) */}
@@ -248,7 +248,7 @@ export default function SeriesBatchApply({
           </div>
 
           {/* Scroll container - this is where internal scrolling happens */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-5">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 md:p-6 space-y-5" style={{ WebkitOverflowScrolling: 'touch' }}>
             {/* Status */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -404,12 +404,14 @@ export default function SeriesBatchApply({
                 </ul>
               </div>
             )}
+
+            {/* Spacer to ensure content can scroll past BottomNav on mobile */}
+            <div className="h-[72px] md:hidden" aria-hidden="true" />
           </div>
 
-          {/* Footer - non-scrolling, always visible */}
+          {/* Footer - non-scrolling, always visible, clears BottomNav on mobile */}
           <div
-            className="flex-shrink-0 p-4 md:p-6 border-t border-netflix-gray/50 flex gap-3 bg-netflix-dark rounded-b-xl"
-            style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}
+            className="flex-shrink-0 sticky bottom-0 pt-4 px-4 md:p-6 border-t border-netflix-gray/50 flex gap-3 bg-netflix-dark md:rounded-b-xl pb-[calc(16px+env(safe-area-inset-bottom,0px)+72px)] md:pb-6"
           >
             <button
               onClick={onClose}
