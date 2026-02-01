@@ -58,25 +58,25 @@ function EditableCandidateRow({ candidate, onChange }: EditableCandidateRowProps
         />
       </td>
 
-      {/* Title (editable) */}
-      <td className="p-2">
+      {/* Title (editable) - larger for readability */}
+      <td className="p-2 min-w-[320px]">
         <input
           type="text"
           value={candidate.title}
           onChange={(e) => handleFieldChange('title', e.target.value)}
-          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-base md:text-lg text-white h-11"
           disabled={!candidate.selected}
         />
       </td>
 
-      {/* Author (editable) */}
-      <td className="p-2">
+      {/* Author (editable) - larger for readability */}
+      <td className="p-2 min-w-[240px]">
         <input
           type="text"
           value={candidate.author || ''}
           onChange={(e) => handleFieldChange('author', e.target.value || null)}
           placeholder="—"
-          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white placeholder-gray-500"
+          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-base md:text-lg text-white placeholder-gray-500 h-11"
           disabled={!candidate.selected}
         />
       </td>
@@ -440,12 +440,12 @@ export default function AddFromFilesSection() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[1400px]">
               <thead className="text-xs text-gray-400 uppercase bg-gray-800/50">
                 <tr>
                   <th className="p-2 w-8">☑</th>
-                  <th className="p-2">Title</th>
-                  <th className="p-2">Author</th>
+                  <th className="p-2 min-w-[320px]">Title</th>
+                  <th className="p-2 min-w-[240px]">Author</th>
                   <th className="p-2">Series</th>
                   <th className="p-2 w-16">#</th>
                   <th className="p-2">Narrator</th>
