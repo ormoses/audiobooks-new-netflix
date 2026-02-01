@@ -323,6 +323,114 @@ export interface CoverUploadResponse {
   error?: string;
 }
 
+// ============ Add from Files (Scan + Commit) ============
+
+// Supported audio file extensions
+export const AUDIO_EXTENSIONS = ['.mp3', '.m4a', '.m4b', '.flac', '.opus', '.ogg', '.aac'];
+export const AUDIOBOOK_EXTENSIONS = ['.m4b']; // Treated as standalone audiobook files
+
+// Scanned book candidate from file system
+export interface ScannedBookCandidate {
+  // Identification
+  id: string; // Temporary ID for UI (e.g., hash of path)
+  path: string;
+  type: 'Folder' | 'SingleFile';
+
+  // Detected metadata (best-effort)
+  title: string;
+  author: string | null;
+  narrator: string | null;
+  series: string | null;
+  seriesBookNumber: string | null;
+
+  // File info
+  durationSeconds: number | null;
+  totalSizeBytes: number;
+  fileCount: number;
+  hasEmbeddedCover: boolean;
+
+  // For folders with multiple .m4b files
+  multipleM4bFiles?: boolean;
+  m4bFileCount?: number;
+  m4bFilePaths?: string[]; // Paths of the .m4b files
+  userDecision?: 'single' | 'multiple' | null; // User's choice for multi-.m4b folders
+
+  // Validation
+  warnings: string[];
+  errors: string[];
+
+  // UI state
+  selected: boolean;
+  existsInDb?: boolean; // True if path already exists in DB
+}
+
+// Candidate after user review/editing (sent to commit)
+export interface ReviewedBookCandidate {
+  path: string;
+  type: 'Folder' | 'SingleFile';
+  title: string;
+  author: string | null;
+  narrator: string | null;
+  series: string | null;
+  seriesBookNumber: string | null;
+  durationSeconds: number | null;
+  totalSizeBytes: number;
+  fileCount: number;
+  hasEmbeddedCover: boolean;
+
+  // For multi-.m4b handling
+  multipleM4bFiles?: boolean;
+  userDecision?: 'single' | 'multiple';
+  m4bFilePaths?: string[];
+}
+
+// Scan request
+export interface FileScanRequest {
+  folderPath: string;
+  recursive?: boolean;
+  maxDepth?: number;
+}
+
+// Scan response
+export interface FileScanResponse {
+  ok: boolean;
+  candidates?: ScannedBookCandidate[];
+  scannedFolders?: number;
+  warnings?: string[];
+  error?: string;
+}
+
+// Commit request
+export interface FileCommitRequest {
+  books: ReviewedBookCandidate[];
+}
+
+// Per-item commit result
+export interface FileCommitItemResult {
+  path: string;
+  status: 'inserted' | 'updated' | 'skipped' | 'error';
+  bookId?: number;
+  coverExtracted?: boolean;
+  coverUploaded?: boolean;
+  error?: string;
+}
+
+// Commit response
+export interface FileCommitResponse {
+  ok: boolean;
+  summary?: {
+    total: number;
+    inserted: number;
+    updated: number;
+    skipped: number;
+    errors: number;
+    coversExtracted: number;
+    coversUploaded: number;
+  };
+  results?: FileCommitItemResult[];
+  error?: string;
+}
+
 // ============ Batch Apply Series Ratings ============
 
 // Apply mode for batch operations

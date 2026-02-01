@@ -1525,6 +1525,149 @@ export async function getBooksForCoverUpload(
   }));
 }
 
+// ============ Add from Files (Scan + Commit) ============
+
+// Upsert a scanned book, preserving user fields for existing rows
+export interface ScannedBookData {
+  path: string;
+  type: 'Folder' | 'SingleFile';
+  title: string;
+  author: string | null;
+  narrator: string | null;
+  series: string | null;
+  seriesBookNumber: string | null;
+  durationSeconds: number | null;
+  totalSizeBytes: number;
+  fileCount: number;
+  hasEmbeddedCover: boolean;
+}
+
+export interface UpsertScannedBookResult {
+  bookId: number;
+  status: 'inserted' | 'updated';
+}
+
+export async function upsertScannedBook(data: ScannedBookData): Promise<UpsertScannedBookResult> {
+  await initializeSchema();
+  const database = getDatabase();
+  const now = new Date().toISOString();
+
+  // Check if book exists
+  const existing = await database.execute({
+    sql: 'SELECT id, title, author, narrator, series, series_book_number, duration_seconds FROM books WHERE path = ?',
+    args: [data.path],
+  });
+
+  if (existing.rows.length > 0) {
+    // Update existing book - only update metadata fields where new value is non-empty
+    // Preserve user fields: status, book_rating, tags, notes (not touched)
+    const row = existing.rows[0];
+    const bookId = row.id as number;
+
+    // Build update query - only update if new value is provided and non-empty
+    const updates: string[] = [];
+    const args: (string | number | null)[] = [];
+
+    // Type
+    updates.push('type = ?');
+    args.push(data.type);
+
+    // Title - update if new value is non-empty
+    if (data.title && data.title.trim()) {
+      updates.push('title = ?');
+      args.push(data.title.trim());
+    }
+
+    // Author - update if new value is non-empty, keep existing otherwise
+    if (data.author && data.author.trim()) {
+      updates.push('author = ?');
+      args.push(data.author.trim());
+    }
+
+    // Narrator - update if new value is non-empty
+    if (data.narrator && data.narrator.trim()) {
+      updates.push('narrator = ?');
+      args.push(data.narrator.trim());
+    }
+
+    // Series - update if new value is non-empty
+    if (data.series && data.series.trim()) {
+      updates.push('series = ?');
+      args.push(data.series.trim());
+    }
+
+    // Series book number - update if new value is non-empty
+    if (data.seriesBookNumber && data.seriesBookNumber.trim()) {
+      updates.push('series_book_number = ?');
+      args.push(data.seriesBookNumber.trim());
+    }
+
+    // Duration - always update if provided
+    if (data.durationSeconds !== null) {
+      updates.push('duration_seconds = ?');
+      args.push(data.durationSeconds);
+    }
+
+    // Size and file count - always update
+    updates.push('total_size_bytes = ?');
+    args.push(data.totalSizeBytes);
+    updates.push('file_count = ?');
+    args.push(data.fileCount);
+
+    // Has embedded cover
+    updates.push('has_embedded_cover = ?');
+    args.push(data.hasEmbeddedCover ? 1 : 0);
+
+    // Clear missing_from_csv flag
+    updates.push('missing_from_csv = 0');
+
+    // Update timestamp
+    updates.push('date_updated = ?');
+    args.push(now);
+
+    args.push(bookId);
+
+    await database.execute({
+      sql: `UPDATE books SET ${updates.join(', ')} WHERE id = ?`,
+      args,
+    });
+
+    return { bookId, status: 'updated' };
+  } else {
+    // Insert new book
+    // Note: We don't force a status - let the DB default handle it
+    const result = await database.execute({
+      sql: `
+        INSERT INTO books (
+          path, type, title, author, narrator,
+          series, series_book_number,
+          duration_seconds, total_size_bytes, file_count,
+          has_embedded_cover, source, missing_from_csv,
+          date_added, date_updated
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', 0, ?, ?)
+      `,
+      args: [
+        data.path,
+        data.type,
+        data.title || 'Unknown Title',
+        data.author,
+        data.narrator,
+        data.series,
+        data.seriesBookNumber,
+        data.durationSeconds,
+        data.totalSizeBytes,
+        data.fileCount,
+        data.hasEmbeddedCover ? 1 : 0,
+        now,
+        now,
+      ],
+    });
+
+    const bookId = Number(result.lastInsertRowid);
+    return { bookId, status: 'inserted' };
+  }
+}
+
 // ============ Batch Apply Series Ratings ============
 
 // Normalize narrator name for consistent matching

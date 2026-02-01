@@ -3,6 +3,7 @@ import ImportSection from '@/components/ImportSection';
 import ExportSection from '@/components/ExportSection';
 import CoverExtractionSection from '@/components/CoverExtractionSection';
 import CoverUploadSection from '@/components/CoverUploadSection';
+import AddFromFilesSection from '@/components/AddFromFilesSection';
 import { getAppMeta } from '@/lib/db';
 import { isProduction } from '@/lib/env';
 
@@ -67,6 +68,9 @@ export default async function SettingsPage() {
 
         {/* Cover Upload Section - Only show in local mode (needs local file access) */}
         {!isProd && <CoverUploadSection />}
+
+        {/* Add from Files Section - Only show in local mode */}
+        {!isProd && <AddFromFilesSection />}
 
         {/* About Section */}
         <section className="bg-netflix-dark rounded-lg p-6">
