@@ -7,6 +7,21 @@ import path from 'path';
 import * as mm from 'music-metadata';
 import { ScannedBookCandidate, AUDIO_EXTENSIONS, AUDIOBOOK_EXTENSIONS } from './types';
 
+// Generic folder names that should not be used as book titles
+const GENERIC_FOLDER_NAMES = new Set([
+  'audiobooks', 'audiobook', 'audio', 'books', 'book',
+  'new', 'downloads', 'download', 'temp', 'tmp',
+  'incoming', 'unsorted', 'misc', 'other', 'unknown',
+  'media', 'audio files', 'music', 'podcasts',
+  'to sort', 'to organize', 'unorganized',
+]);
+
+// Check if a folder name is generic/unusable as a title
+function isGenericFolderName(name: string): boolean {
+  const normalized = name.toLowerCase().trim();
+  return GENERIC_FOLDER_NAMES.has(normalized) || normalized.length < 2;
+}
+
 // Generate a simple hash for temporary IDs
 function generateId(str: string): string {
   let hash = 0;
@@ -192,11 +207,19 @@ async function processFolderAsBook(folderPath: string): Promise<ScannedBookCandi
 
     warnings.push(`Multiple .m4b files (${m4bFiles.length}): user decision required`);
 
+    // Title priority: folder name first, fall back to tag if folder name is generic
+    const folderTitle = cleanTitle || folderName;
+    const useTagTitle = isGenericFolderName(folderTitle) && firstMeta.title;
+    const title = useTagTitle ? firstMeta.title! : folderTitle;
+    if (!useTagTitle && !firstMeta.title) {
+      warnings.push('Title from folder name (no embedded title tag)');
+    }
+
     return {
       id: generateId(folderPath),
       path: folderPath,
       type: 'Folder',
-      title: firstMeta.title || cleanTitle || folderName,
+      title,
       author: firstMeta.author,
       narrator: firstMeta.narrator,
       series: series,
@@ -220,11 +243,19 @@ async function processFolderAsBook(folderPath: string): Promise<ScannedBookCandi
     const meta = await extractFileMetadata(m4bFiles[0]);
     const { series, bookNumber, cleanTitle } = parseSeriesFromName(folderName);
 
+    // Title priority: folder name first, fall back to tag if folder name is generic
+    const folderTitle = cleanTitle || folderName;
+    const useTagTitle = isGenericFolderName(folderTitle) && meta.title;
+    const title = useTagTitle ? meta.title! : folderTitle;
+    if (!useTagTitle && !meta.title) {
+      warnings.push('Title from folder name (no embedded title tag)');
+    }
+
     return {
       id: generateId(folderPath),
       path: folderPath,
       type: 'Folder',
-      title: meta.title || cleanTitle || folderName,
+      title,
       author: meta.author,
       narrator: meta.narrator,
       series: series,
@@ -258,11 +289,19 @@ async function processFolderAsBook(folderPath: string): Promise<ScannedBookCandi
 
   const { series, bookNumber, cleanTitle } = parseSeriesFromName(folderName);
 
+  // Title priority: folder name first, fall back to tag if folder name is generic
+  const folderTitle = cleanTitle || folderName;
+  const useTagTitle = isGenericFolderName(folderTitle) && representativeMeta.title;
+  const title = useTagTitle ? representativeMeta.title! : folderTitle;
+  if (!useTagTitle && !representativeMeta.title) {
+    warnings.push('Title from folder name (no embedded title tag)');
+  }
+
   return {
     id: generateId(folderPath),
     path: folderPath,
     type: 'Folder',
-    title: representativeMeta.title || cleanTitle || folderName,
+    title,
     author: representativeMeta.author,
     narrator: representativeMeta.narrator,
     series: series,
