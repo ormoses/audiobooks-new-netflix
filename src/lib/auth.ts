@@ -110,7 +110,14 @@ export function verifyPassword(password: string): boolean {
     console.error('[Auth] APP_PASSWORD not configured');
     return false;
   }
-  return password === appPassword;
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(password),
+      Buffer.from(appPassword)
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

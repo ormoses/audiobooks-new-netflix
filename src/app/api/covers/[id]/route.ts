@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBookCoverPath, getBookCoverUrl } from '@/lib/db';
 import { isDeployedCloud } from '@/lib/env';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 interface RouteParams {
@@ -44,16 +44,23 @@ export async function GET(
       return new NextResponse('No cover found', { status: 404 });
     }
 
-    // Build absolute path
-    const absolutePath = path.resolve(process.cwd(), './data', coverPath);
+    // Build absolute path and verify it stays within the data directory
+    const dataDir = path.resolve(process.cwd(), 'data');
+    const absolutePath = path.resolve(dataDir, coverPath);
+
+    if (!absolutePath.startsWith(dataDir + path.sep) && absolutePath !== dataDir) {
+      return new NextResponse('Invalid cover path', { status: 400 });
+    }
 
     // Check if file exists
-    if (!fs.existsSync(absolutePath)) {
+    try {
+      await fs.access(absolutePath);
+    } catch {
       return new NextResponse('Cover file not found', { status: 404 });
     }
 
     // Read file and return
-    const fileBuffer = fs.readFileSync(absolutePath);
+    const fileBuffer = await fs.readFile(absolutePath);
 
     return new NextResponse(fileBuffer, {
       status: 200,

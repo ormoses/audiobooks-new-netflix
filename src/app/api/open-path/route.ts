@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import { OpenPathResponse } from '@/lib/types';
 import { isProduction } from '@/lib/env';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export async function POST(request: NextRequest): Promise<NextResponse<OpenPathResponse>> {
   // Block in production - only makes sense for local development
@@ -42,19 +42,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<OpenPathR
       });
     }
 
-    // Build the explorer command
-    let command: string;
-
-    if (type === 'Folder') {
-      // Open folder directly
-      command = `explorer.exe "${path}"`;
-    } else {
-      // Open Explorer and select the file
-      command = `explorer.exe /select,"${path}"`;
-    }
+    // Build args for explorer.exe (execFile avoids shell interpretation)
+    const args = type === 'Folder'
+      ? [path]
+      : ['/select,', path];
 
     try {
-      await execAsync(command);
+      await execFileAsync('explorer.exe', args);
       return NextResponse.json({ ok: true });
     } catch (execError) {
       // explorer.exe returns exit code 1 even on success sometimes

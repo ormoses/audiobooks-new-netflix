@@ -28,16 +28,28 @@ export default function LibraryClient({ initialBooks, initialTotal }: LibraryCli
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Parse initial state from URL
-  const initialView = (searchParams.get('view') as LibraryView) || 'books';
+  // Parse initial state from URL with validation
+  const VALID_VIEWS: LibraryView[] = ['books', 'series'];
+  const VALID_STATUSES: BookStatus[] = ['not_started', 'in_progress', 'finished'];
+  const VALID_RATING_FILTERS: RatingFilter[] = ['all', 'fullyRated', 'unrated'];
+  const VALID_SERIES_RATING_FILTERS: SeriesRatingFilter[] = ['all', 'fullyRated', 'partlyRated', 'unrated'];
+
+  const rawView = searchParams.get('view');
+  const initialView: LibraryView = rawView && VALID_VIEWS.includes(rawView as LibraryView)
+    ? (rawView as LibraryView) : 'books';
   const initialSearch = searchParams.get('search') || '';
   const initialStatuses = searchParams.get('status')
-    ? (searchParams.get('status')!.split(',') as BookStatus[])
+    ? searchParams.get('status')!.split(',').filter((s): s is BookStatus => VALID_STATUSES.includes(s as BookStatus))
     : [];
-  const initialBookRatingFilter = (searchParams.get('rating') as RatingFilter) || 'all';
-  const initialSeriesRatingFilter = (searchParams.get('rating') as SeriesRatingFilter) || 'all';
+  const rawRating = searchParams.get('rating');
+  const initialBookRatingFilter: RatingFilter = rawRating && VALID_RATING_FILTERS.includes(rawRating as RatingFilter)
+    ? (rawRating as RatingFilter) : 'all';
+  const initialSeriesRatingFilter: SeriesRatingFilter = rawRating && VALID_SERIES_RATING_FILTERS.includes(rawRating as SeriesRatingFilter)
+    ? (rawRating as SeriesRatingFilter) : 'all';
   const initialSort = searchParams.get('sort') || 'title-asc';
-  const initialCompletion = searchParams.get('completion') as BookStatus | null;
+  const rawCompletion = searchParams.get('completion');
+  const initialCompletion: BookStatus | null = rawCompletion && VALID_STATUSES.includes(rawCompletion as BookStatus)
+    ? (rawCompletion as BookStatus) : null;
 
   // State
   const [view, setView] = useState<LibraryView>(initialView);

@@ -3,6 +3,7 @@ import { scanFolder } from '@/lib/file-scanner';
 import { FileScanRequest, FileScanResponse } from '@/lib/types';
 import { isProduction } from '@/lib/env';
 import { initializeSchema } from '@/lib/db';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,9 @@ export async function POST(
       error: 'File scanning is only available in local mode',
     }, { status: 403 });
   }
+
+  const auth = await requireAuth();
+  if (auth instanceof Response) return auth as NextResponse<FileScanResponse>;
 
   try {
     const body: FileScanRequest = await request.json();
